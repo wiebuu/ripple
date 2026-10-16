@@ -1,30 +1,53 @@
 import { Tabs } from 'expo-router';
-import { Icon, type IconName } from '@/components/ui';
+import { Pressable, View } from 'react-native';
+import { Icon, haptic, type IconName } from '@/components/ui';
 import { useNotifications } from '@/lib/queries';
-import { fonts, useTheme } from '@/theme';
+import { shadow, useTheme } from '@/theme';
 
 const tab = (title: string, icon: IconName, iconActive: IconName) => ({
   title,
   tabBarAccessibilityLabel: title,
-  tabBarIcon: ({ color, focused }: { color: any; focused: boolean }) => <Icon name={focused ? iconActive : icon} size={24} color={color} />,
+  tabBarIcon: ({ color, focused }: { color: any; focused: boolean }) => <Icon name={focused ? iconActive : icon} size={26} color={color} />,
 });
 
-/** Five stable primary destinations. */
+/** Raised round button for the primary creator action. */
+function CreateButton({ onPress, accessibilityState }: { onPress?: (e: any) => void; accessibilityState?: { selected?: boolean } }) {
+  const { c } = useTheme();
+  return (
+    <View style={{ flex: 1, alignItems: 'center' }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Create a campaign"
+        accessibilityState={accessibilityState}
+        onPress={onPress}
+        hitSlop={6}
+        style={({ pressed }) => [
+          { width: 58, height: 58, borderRadius: 29, marginTop: -18, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: c.surface, transform: [{ scale: pressed ? 0.94 : 1 }] },
+          shadow.card,
+        ]}>
+        <Icon name="add" size={30} color={c.onPrimary} />
+      </Pressable>
+    </View>
+  );
+}
+
+/** Five stable primary destinations. Icons only; each tab keeps an accessibility label. */
 export default function TabsLayout() {
   const { c } = useTheme();
   const unread = useNotifications().data?.unread ?? 0;
   return (
     <Tabs
+      screenListeners={{ tabPress: () => haptic.light() }}
       screenOptions={{
         headerShown: false,
+        tabBarShowLabel: false,
         tabBarActiveTintColor: c.primary,
         tabBarInactiveTintColor: c.textMuted,
-        tabBarLabelStyle: { fontFamily: fonts.sansMedium, fontSize: 11 },
-        tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.border, paddingTop: 4 },
+        tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.border, paddingTop: 6 },
       }}>
       <Tabs.Screen name="index" options={tab('Home', 'home-outline', 'home')} />
       <Tabs.Screen name="explore" options={tab('Explore', 'search-outline', 'search')} />
-      <Tabs.Screen name="create" options={tab('Create', 'add-circle-outline', 'add-circle')} />
+      <Tabs.Screen name="create" options={{ title: 'Create', tabBarButton: (props) => <CreateButton onPress={props.onPress} accessibilityState={props.accessibilityState} /> }} />
       <Tabs.Screen
         name="activity"
         options={{ ...tab('Activity', 'notifications-outline', 'notifications'), tabBarBadge: unread ? (unread > 9 ? '9+' : unread) : undefined, tabBarBadgeStyle: { backgroundColor: c.accent, fontSize: 10 } }}

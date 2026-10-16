@@ -1,14 +1,15 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Animated, FlatList, Pressable, RefreshControl, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { peoplePerDollar } from '@shared';
 import { CampaignCard, CardSkeleton, ReachInfo } from '@/components/campaign';
-import { Button, Card, ErrorState, Icon, IconButton, SectionTitle, T, type IconName } from '@/components/ui';
-import { useCampaigns } from '@/lib/queries';
+import { Button, Card, ErrorState, Icon, IconButton, SectionTitle, T, haptic, type IconName } from '@/components/ui';
+import { useCollapsingHeader } from '@/hooks/useCollapsingHeader';
+import { useCampaigns, useInfiniteCampaigns, useNotifications } from '@/lib/queries';
 import { radius, space, useTheme } from '@/theme';
 
-export function Wordmark() {
+function Wordmark() {
   const { c } = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} accessibilityRole="header" accessibilityLabel="Campaigns">
@@ -22,6 +23,24 @@ export function Wordmark() {
   );
 }
 
+/** Bell with unread count. Opens the Activity tab, where notifications live. */
+function NotificationBell() {
+  const { c } = useTheme();
+  const unread = useNotifications().data?.unread ?? 0;
+  return (
+    <View>
+      <IconButton icon="notifications-outline" label={unread ? `Notifications, ${unread} unread` : 'Notifications'} onPress={() => router.navigate('/activity')} />
+      {unread > 0 && (
+        <View pointerEvents="none" style={{ position: 'absolute', top: 6, right: 6, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: c.bg }}>
+          <T variant="smallStrong" style={{ color: '#fff', fontSize: 10, lineHeight: 12 }}>
+            {unread > 9 ? '9+' : unread}
+          </T>
+        </View>
+      )}
+    </View>
+  );
+}
+
 const STEPS: { icon: IconName; who: string; title: string; body: string }[] = [
   { icon: 'create-outline', who: 'Creator', title: 'Create', body: 'Write the message, add sources, and choose who it should reach.' },
   { icon: 'shield-checkmark-outline', who: 'Platform', title: 'Review', body: 'We check claims against sources and prepare the ads with distribution partners.' },
@@ -31,24 +50,67 @@ const STEPS: { icon: IconName; who: string; title: string; body: string }[] = [
 export default function Home() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const [reachOpen, setReachOpen] = useState(false);
+  const header = useCollapsingHeader();
   const featured = useCampaigns({ featured: true, status: 'all', sort: 'trending' });
-  const feed = useCampaigns({ status: 'all', sort: 'trending', limit: 12 });
-  const cardW = Math.min(width - 56, 360);
+  const feed = useInfiniteCampaigns({ status: 'all', sort: 'trending' });
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = async () => {
+    haptic.light();
+    setRefreshing(true);
+    await Promise.all([feed.refetch(), featured.refetch()]);
+    setRefreshing(false);
+  };
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: c.bg }}
-      contentContainerStyle={{ paddingTop: insets.top + space.sm, paddingBottom: space.huge }}
-      refreshControl={<RefreshControl refreshing={feed.isRefetching} onRefresh={() => { feed.refetch(); featured.refetch(); }} tintColor={c.primary} />}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.xl, paddingBottom: space.md }}>
-        <Wordmark />
-        <IconButton icon="help-circle-outline" label="How it works" onPress={() => router.push('/info/how-it-works')} />
-      </View>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      {/* Status bar backdrop so content never shows behind the clock when the header hides */}
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: c.bg, zIndex: 20 }} />
+      <Animated.View onLayout={header.onLayout} style={[header.headerStyle, { top: insets.top, backgroundColor: c.bg }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: space.xl, paddingRight: space.sm, height: 56 }}>
+          <Wordmark />
+          <View style={{ flexDirection: 'row' }}>
+            <IconButton icon="help-circle-outline" label="How it works" onPress={() => router.push('/info/how-it-works')} />
+            <NotificationBell />
+          </View>
+        </View>
+      </Animated.View>
 
+      <Animated.FlatList
+        data={feed.items}
+        keyExtractor={(item) => item.id}
+        onScroll={header.onScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={{ paddingTop: insets.top + header.height, paddingBottom: space.huge }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={c.primary} progressViewOffset={insets.top + header.height} />}
+        onEndReached={feed.loadMore}
+        onEndReachedThreshold={0.6}
+        ListHeaderComponent={<HomeIntro featured={featured} />}
+        renderItem={({ item }) => (
+          <View style={{ paddingHorizontal: space.xl, paddingBottom: space.lg }}>
+            <CampaignCard c={item} />
+          </View>
+        )}
+        ListEmptyComponent={
+          <View style={{ paddingHorizontal: space.xl, gap: space.lg }}>
+            {feed.isPending ? [0, 1].map((i) => <CardSkeleton key={i} />) : feed.isError ? <ErrorState message={(feed.error as Error).message} onRetry={() => feed.refetch()} /> : null}
+          </View>
+        }
+        ListFooterComponent={<HomeFooter loading={feed.isFetchingNextPage} done={!feed.hasNextPage && feed.items.length > 0} pageError={feed.isFetchNextPageError} onRetry={() => feed.fetchNextPage()} />}
+      />
+    </View>
+  );
+}
+
+function HomeIntro({ featured }: { featured: ReturnType<typeof useCampaigns> }) {
+  const { c } = useTheme();
+  const { width } = useWindowDimensions();
+  const [reachOpen, setReachOpen] = useState(false);
+  const cardW = Math.min(width - 56, 360);
+  return (
+    <View style={{ paddingBottom: space.lg }}>
       {/* Hero */}
-      <View style={{ paddingHorizontal: space.xl, gap: space.lg, paddingTop: space.md }}>
+      <View style={{ paddingHorizontal: space.xl, gap: space.lg, paddingTop: space.sm }}>
         <T variant="display" style={{ fontSize: 36, lineHeight: 42 }}>
           Deliver messages beyond your feed.
         </T>
@@ -72,8 +134,8 @@ export default function Home() {
           <Icon name="information-circle-outline" size={20} color={c.primary} />
         </Pressable>
         <View style={{ gap: space.sm }}>
-          <Button label="Explore campaigns" size="lg" onPress={() => router.push('/explore')} />
-          <Button label="Start a campaign" size="lg" variant="secondary" onPress={() => router.push('/create')} />
+          <Button label="Explore campaigns" size="lg" onPress={() => router.navigate('/explore')} />
+          <Button label="Start a campaign" size="lg" variant="secondary" onPress={() => router.navigate('/create')} />
         </View>
       </View>
       <ReachInfo visible={reachOpen} onClose={() => setReachOpen(false)} />
@@ -81,10 +143,10 @@ export default function Home() {
       {/* Featured */}
       <View style={{ marginTop: space.huge, gap: space.lg }}>
         <View style={{ paddingHorizontal: space.xl }}>
-          <SectionTitle overline="Featured" title="Messages gaining momentum" action="See all" onAction={() => router.push('/explore')} />
+          <SectionTitle overline="Featured" title="Messages gaining momentum" action="See all" onAction={() => router.navigate('/explore')} />
         </View>
         {featured.isError ? (
-          <ErrorState message={(featured.error as Error).message} onRetry={featured.refetch} />
+          <ErrorState message={(featured.error as Error).message} onRetry={() => featured.refetch()} />
         ) : (
           <FlatList
             horizontal
@@ -102,7 +164,7 @@ export default function Home() {
       {/* How it works */}
       <View style={{ marginTop: space.huge, paddingHorizontal: space.xl, gap: space.lg }}>
         <SectionTitle overline="How it works" title="Create. Review. Amplify." />
-        <View style={{ gap: 0 }}>
+        <View>
           {STEPS.map((s, i) => (
             <View key={s.title} style={{ flexDirection: 'row', gap: space.lg }}>
               <View style={{ alignItems: 'center' }}>
@@ -134,32 +196,39 @@ export default function Home() {
         </Card>
       </View>
 
-      {/* Feed */}
-      <View style={{ marginTop: space.huge, paddingHorizontal: space.xl, gap: space.lg }}>
-        <SectionTitle overline="Campaign feed" title="Open for backing" action="Explore" onAction={() => router.push('/explore')} />
-        {feed.isPending ? (
-          [0, 1].map((i) => <CardSkeleton key={i} />)
-        ) : feed.isError ? (
-          <ErrorState message={(feed.error as Error).message} onRetry={feed.refetch} />
-        ) : (
-          feed.data.items.map((item) => <CampaignCard key={item.id} c={item} />)
-        )}
-        <Card style={{ alignItems: 'center', gap: space.md, paddingVertical: space.xxl }}>
-          <T variant="heading" center>
-            Have a message that should travel further?
-          </T>
-          <T color="textMuted" center>
-            Nonprofits, creators, businesses and community groups can create a campaign in five steps.
-          </T>
-          <Button label="Start a campaign" icon="add" onPress={() => router.push('/create')} />
-        </Card>
+      <View style={{ marginTop: space.huge, paddingHorizontal: space.xl }}>
+        <SectionTitle overline="Campaign feed" title="All campaigns" action="Search" onAction={() => router.navigate('/explore')} />
       </View>
+    </View>
+  );
+}
 
-      <View style={{ marginTop: space.xxxl, paddingHorizontal: space.xl, flexDirection: 'row', flexWrap: 'wrap', gap: space.lg }}>
+function HomeFooter({ loading, done, pageError, onRetry }: { loading: boolean; done: boolean; pageError: boolean; onRetry: () => void }) {
+  const { c } = useTheme();
+  return (
+    <View style={{ paddingHorizontal: space.xl, gap: space.xl }}>
+      {loading && <ActivityIndicator color={c.primary} style={{ paddingVertical: space.lg }} accessibilityLabel="Loading more campaigns" />}
+      {pageError && <Button label="Couldn’t load more. Try again" variant="secondary" icon="refresh" onPress={onRetry} />}
+      {done && (
+        <T variant="small" color="textSubtle" center>
+          You’ve seen every campaign. Check back soon.
+        </T>
+      )}
+      <Card style={{ alignItems: 'center', gap: space.md, paddingVertical: space.xxl }}>
+        <T variant="heading" center>
+          Have a message that should travel further?
+        </T>
+        <T color="textMuted" center>
+          Nonprofits, creators, businesses and community groups can create a campaign in five steps.
+        </T>
+        <Button label="Start a campaign" icon="add" onPress={() => router.navigate('/create')} />
+      </Card>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.lg }}>
         {[
           ['About', 'about'],
           ['Partners', 'partners'],
           ['FAQs', 'faq'],
+          ['Help', 'help'],
           ['Community guidelines', 'guidelines'],
           ['Terms', 'terms'],
           ['Privacy', 'privacy'],
@@ -171,6 +240,6 @@ export default function Home() {
           </Pressable>
         ))}
       </View>
-    </ScrollView>
+    </View>
   );
 }

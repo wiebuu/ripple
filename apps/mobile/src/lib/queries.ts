@@ -1,4 +1,4 @@
-import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { QueryClient, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AppNotification,
   CampaignDetail,
@@ -37,6 +37,27 @@ export const useCampaigns = (p: ListParams = {}) =>
     queryKey: ['campaigns', p],
     queryFn: () => api<{ items: CampaignSummary[]; total: number }>(`/campaigns?${qs(p)}`),
   });
+
+export const PAGE_SIZE = 6;
+
+/** Paginated campaign list: loads one page at a time as the user scrolls. */
+export function useInfiniteCampaigns(p: Omit<ListParams, 'limit'> = {}) {
+  const q = useInfiniteQuery({
+    queryKey: ['campaigns', 'infinite', p],
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      api<{ items: CampaignSummary[]; total: number; nextOffset: number | null }>(`/campaigns?${qs({ ...p, limit: PAGE_SIZE, offset: pageParam })}`),
+    getNextPageParam: (last) => last.nextOffset ?? undefined,
+  });
+  return {
+    ...q,
+    items: q.data?.pages.flatMap((pg) => pg.items) ?? [],
+    total: q.data?.pages[0]?.total ?? 0,
+    loadMore: () => {
+      if (q.hasNextPage && !q.isFetchingNextPage && !q.isError) q.fetchNextPage();
+    },
+  };
+}
 
 export type Detail = CampaignDetail & { hasPendingRevision?: boolean };
 export const useCampaign = (id?: string) =>

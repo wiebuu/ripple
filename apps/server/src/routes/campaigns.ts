@@ -18,7 +18,8 @@ const listQuery = z.object({
   sort: z.enum(['trending', 'newest', 'closest', 'ending', 'most_backed']).default('trending'),
   minPct: z.coerce.number().min(0).max(100).optional(),
   featured: z.coerce.boolean().optional(),
-  limit: z.coerce.number().min(1).max(50).default(30),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  offset: z.coerce.number().int().min(0).default(0),
 });
 
 const STATUS_FILTER: Record<string, string[]> = {
@@ -55,7 +56,10 @@ campaigns.get(
       most_backed: (a, b) => b.backerCount - a.backerCount,
     };
     rows.sort(sorters[q.sort]);
-    res.json({ items: rows.slice(0, q.limit).map(toSummary), total: rows.length });
+    // Offset pagination: the app requests one page at a time as the user scrolls.
+    const page = rows.slice(q.offset, q.offset + q.limit);
+    const nextOffset = q.offset + page.length < rows.length ? q.offset + page.length : null;
+    res.json({ items: page.map(toSummary), total: rows.length, nextOffset });
   }),
 );
 
