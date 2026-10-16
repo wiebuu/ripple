@@ -43,7 +43,7 @@ export default function CampaignScreen() {
   const d = q.data;
   const headerOpacity = scrollY.interpolate({ inputRange: [180, 240], outputRange: [0, 1], extrapolate: 'clamp' });
   const backable = BACKABLE_STATUSES.includes(d.status);
-  const passed = fundEnd ? colY + fundEnd - (insets.top + 52) : 1e6;
+  const passed = fundEnd ? colY + fundEnd - (insets.top + 60) : 1e6;
   const footerShift = scrollY.interpolate({ inputRange: [passed - 40, passed], outputRange: [140, 0], extrapolate: 'clamp' });
   const footerFade = scrollY.interpolate({ inputRange: [passed - 40, passed], outputRange: [0, 1], extrapolate: 'clamp' });
 
@@ -59,10 +59,10 @@ export default function CampaignScreen() {
           left: 0,
           right: 0,
           paddingTop: insets.top,
-          height: insets.top + 52,
+          // 8pt of breathing room below the buttons; paddingBottom keeps the title level with them.
+          height: insets.top + 60,
+          paddingBottom: 8,
           backgroundColor: c.bg,
-          borderBottomWidth: 1,
-          borderBottomColor: c.border,
           opacity: headerOpacity,
           justifyContent: 'center',
           paddingLeft: 60,
