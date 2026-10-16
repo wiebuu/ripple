@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite has no enums; allowed values live in /shared and are enforced by the API.
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  email         String?        @unique
+  role          String         @default("USER") // USER | REVIEWER
+  isGuest       Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  campaigns     Campaign[]
+  contributions Contribution[]
+  notifications Notification[]
+  follows       Follow[]
+  saves         Save[]
+  prefs         Json?
+}
+
+model Campaign {
+  id             String           @id @default(cuid())
+  slug           String           @unique
+  ownerId        String
+  owner          User             @relation(fields: [ownerId], references: [id])
+  status         String           @default("DRAFT")
+  // Denormalised from content for listing/search.
+  title          String           @default("")
+  summary        String           @default("")
+  category       String           @default("")
+  creatorName    String           @default("")
+  creatorType    String           @default("Individual")
+  coverImage     String           @default("")
+  content        Json // DraftContent
+  // Content waiting for re-review after a material edit to a live campaign.
+  pendingContent Json?
+  goal           Float?
+  raised         Float            @default(0)
+  backerCount    Int              @default(0)
+  featured       Boolean          @default(false)
+  isDemo         Boolean          @default(false)
+  // Distribution readiness checklist, set by reviewers.
+  budgetApproved Boolean          @default(false)
+  adSetupReady   Boolean          @default(false)
+  submittedAt    DateTime?
+  publishedAt    DateTime?
+  endsAt         DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  contributions  Contribution[]
+  decisions      ReviewDecision[]
+  updates        CampaignUpdate[]
+  follows        Follow[]
+  saves          Save[]
+  feedback       Feedback[]
+  report         Report?
+
+  @@index([status])
+  @@index([category])
+}
+
+model Contribution {
+  id             String   @id @default(cuid())
+  campaignId     String
+  campaign       Campaign @relation(fields: [campaignId], references: [id])
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id])
+  amount         Float
+  platformFee    Float
+  processingFee  Float
+  total          Float
+  estimatedReach Int
+  status         String   @default("PENDING") // PENDING | SUCCEEDED | FAILED | CANCELLED | REFUNDED
+  failureReason  String?
+  showName       Boolean  @default(false)
+  displayName    String?
+  receiptEmail   String?
+  receiptNo      String   @unique
+  cardLast4      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([campaignId, status])
+}
+
+model ReviewDecision {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  actorId    String?
+  actorName  String?
+  action     String
+  fromStatus String?
+  toStatus   String
+  note       String?
+  createdAt  DateTime @default(now())
+}
+
+model CampaignUpdate {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  title      String
+  body       String
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  kind       String
+  title      String
+  body       String
+  campaignId String?
+  read       Boolean  @default(false)
+  dedupeKey  String?
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, dedupeKey])
+}
+
+model Follow {
+  userId     String
+  campaignId String
+  user       User     @relation(fields: [userId], references: [id])
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@id([userId, campaignId])
+}
+
+model Save {
+  userId     String
+  campaignId String
+  user       User     @relation(fields: [userId], references: [id])
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@id([userId, campaignId])
+}
+
+model Feedback {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  userId     String?
+  question   String // VISUALS | MIND_CHANGED
+  answer     String // NO | SOMEWHAT | YES
+  createdAt  DateTime @default(now())
+}
+
+model Report {
+  campaignId    String    @id
+  campaign      Campaign  @relation(fields: [campaignId], references: [id])
+  adSpend       Float     @default(0)
+  impressions   Int?
+  measuredReach Int?
+  clicks        Int?
+  byChannel     Json?
+  startedAt     DateTime?
+  endedAt       DateTime?
+  final         Boolean   @default(false)
+  updatedAt     DateTime  @updatedAt
+}
