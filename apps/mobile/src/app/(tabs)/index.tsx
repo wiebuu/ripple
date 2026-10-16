@@ -1,103 +1,100 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, Animated, FlatList, Pressable, RefreshControl, useWindowDimensions, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { ActivityIndicator, Animated, FlatList, Pressable, RefreshControl, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { peoplePerDollar } from '@shared';
-import { CampaignCard, CardSkeleton, ReachInfo } from '@/components/campaign';
-import { Button, Card, ErrorState, Icon, IconButton, SectionTitle, T, haptic, type IconName } from '@/components/ui';
+import { CATEGORIES, peoplePerHundred } from '@shared';
+import { Wordmark } from '@/components/brand/Logo';
+import { TigerPattern } from '@/components/brand/TigerPattern';
+import { PostCard, PostDivider, PostSkeleton, ReachInfo, SpotlightCard } from '@/components/campaign';
+import { TabHeader } from '@/components/TabHeader';
+import { Button, ErrorState, Icon, IconButton, Skeleton, T, haptic } from '@/components/ui';
 import { useCollapsingHeader } from '@/hooks/useCollapsingHeader';
-import { useCampaigns, useInfiniteCampaigns, useNotifications } from '@/lib/queries';
+import { useTabReselect } from '@/hooks/useTabReselect';
+import { useCampaigns, useInfiniteCampaigns } from '@/lib/queries';
 import { radius, space, useTheme } from '@/theme';
 
-function Wordmark() {
-  const { c } = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} accessibilityRole="header" accessibilityLabel="Campaigns">
-      <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name="megaphone" size={16} color={c.onPrimary} />
-      </View>
-      <T variant="heading" style={{ fontSize: 22 }}>
-        campaigns
-      </T>
-    </View>
-  );
-}
-
-/** Bell with unread count. Opens the Activity tab, where notifications live. */
-function NotificationBell() {
-  const { c } = useTheme();
-  const unread = useNotifications().data?.unread ?? 0;
-  return (
-    <View>
-      <IconButton icon="notifications-outline" label={unread ? `Notifications, ${unread} unread` : 'Notifications'} onPress={() => router.navigate('/activity')} />
-      {unread > 0 && (
-        <View pointerEvents="none" style={{ position: 'absolute', top: 6, right: 6, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: c.bg }}>
-          <T variant="smallStrong" style={{ color: '#fff', fontSize: 10, lineHeight: 12 }}>
-            {unread > 9 ? '9+' : unread}
-          </T>
-        </View>
-      )}
-    </View>
-  );
-}
-
-const STEPS: { icon: IconName; who: string; title: string; body: string }[] = [
-  { icon: 'create-outline', who: 'Creator', title: 'Create', body: 'Write the message, add sources, and choose who it should reach.' },
-  { icon: 'shield-checkmark-outline', who: 'Platform', title: 'Review', body: 'We check claims against sources and prepare the ads with distribution partners.' },
-  { icon: 'radio-outline', who: 'Backers', title: 'Amplify', body: 'People chip in a few dollars to show the message to new audiences. Everyone gets a report.' },
+const STEPS: { who: string; title: string; body: string }[] = [
+  { who: 'Creator', title: 'Create', body: 'Write the message and pick who it should reach.' },
+  { who: 'Platform', title: 'Review', body: 'Claims are checked and the ads prepared.' },
+  { who: 'Backers', title: 'Amplify', body: 'Small amounts fund the reach. Everyone gets a report.' },
 ];
 
 export default function Home() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const header = useCollapsingHeader();
   const featured = useCampaigns({ featured: true, status: 'all', sort: 'trending' });
   const feed = useInfiniteCampaigns({ status: 'all', sort: 'trending' });
   const [refreshing, setRefreshing] = useState(false);
 
+  const list = useRef<FlatList>(null);
+  const header = useCollapsingHeader();
   const refresh = async () => {
     haptic.light();
     setRefreshing(true);
     await Promise.all([feed.refetch(), featured.refetch()]);
     setRefreshing(false);
   };
+  const padTop = insets.top + header.height;
+  useTabReselect(() => {
+    list.current?.scrollToOffset({ offset: 0, animated: true });
+    refresh();
+  });
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       {/* Status bar backdrop so content never shows behind the clock when the header hides */}
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: c.bg, zIndex: 20 }} />
       <Animated.View onLayout={header.onLayout} style={[header.headerStyle, { top: insets.top, backgroundColor: c.bg }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: space.xl, paddingRight: space.sm, height: 56 }}>
-          <Wordmark />
-          <View style={{ flexDirection: 'row' }}>
-            <IconButton icon="help-circle-outline" label="How it works" onPress={() => router.push('/info/how-it-works')} />
-            <NotificationBell />
-          </View>
-        </View>
+        <TabHeader left={<Wordmark />}>
+          <IconButton icon="help-circle-outline" label="How it works" onPress={() => router.push('/info/how-it-works')} />
+        </TabHeader>
       </Animated.View>
 
       <Animated.FlatList
+        ref={list}
         data={feed.items}
         keyExtractor={(item) => item.id}
         onScroll={header.onScroll}
         scrollEventThrottle={16}
-        contentContainerStyle={{ paddingTop: insets.top + header.height, paddingBottom: space.huge }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={c.primary} progressViewOffset={insets.top + header.height} />}
+        contentContainerStyle={{ paddingTop: padTop, paddingBottom: space.huge }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={c.spinner} colors={[c.spinner]} progressViewOffset={padTop} />}
         onEndReached={feed.loadMore}
         onEndReachedThreshold={0.6}
         ListHeaderComponent={<HomeIntro featured={featured} />}
-        renderItem={({ item }) => (
-          <View style={{ paddingHorizontal: space.xl, paddingBottom: space.lg }}>
-            <CampaignCard c={item} />
-          </View>
-        )}
+        renderItem={({ item }) => <PostCard c={item} />}
+        ItemSeparatorComponent={PostDivider}
         ListEmptyComponent={
-          <View style={{ paddingHorizontal: space.xl, gap: space.lg }}>
-            {feed.isPending ? [0, 1].map((i) => <CardSkeleton key={i} />) : feed.isError ? <ErrorState message={(feed.error as Error).message} onRetry={() => feed.refetch()} /> : null}
-          </View>
+          feed.isPending ? (
+            <View>
+              <PostSkeleton />
+              <PostSkeleton />
+            </View>
+          ) : feed.isError ? (
+            <View style={{ paddingHorizontal: space.xl }}>
+              <ErrorState message={(feed.error as Error).message} onRetry={() => feed.refetch()} />
+            </View>
+          ) : null
         }
         ListFooterComponent={<HomeFooter loading={feed.isFetchingNextPage} done={!feed.hasNextPage && feed.items.length > 0} pageError={feed.isFetchNextPageError} onRetry={() => feed.fetchNextPage()} />}
       />
+    </View>
+  );
+}
+
+/** Section heading with an optional text action on the right. */
+function Section({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'baseline', paddingHorizontal: space.xl }}>
+      <T variant="heading" style={{ flex: 1, fontSize: 18, lineHeight: 23 }}>
+        {title}
+      </T>
+      {!!action && (
+        <Pressable accessibilityRole="button" onPress={onAction} hitSlop={8}>
+          <T variant="smallStrong" color="primary">
+            {action}
+          </T>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -106,99 +103,125 @@ function HomeIntro({ featured }: { featured: ReturnType<typeof useCampaigns> }) 
   const { c } = useTheme();
   const { width } = useWindowDimensions();
   const [reachOpen, setReachOpen] = useState(false);
-  const cardW = Math.min(width - 56, 360);
+  const spotW = Math.min(width - 64, 320);
   return (
-    <View style={{ paddingBottom: space.lg }}>
-      {/* Hero */}
-      <View style={{ paddingHorizontal: space.xl, gap: space.lg, paddingTop: space.sm }}>
-        <T variant="display" style={{ fontSize: 36, lineHeight: 42 }}>
-          Deliver messages beyond your feed.
-        </T>
-        <T color="textMuted" style={{ fontSize: 16, lineHeight: 24 }}>
-          Back the messages you care about so they reach people outside the creator’s own network. Your contribution pays for distribution, not the cause itself.
-        </T>
-        <Pressable
-          onPress={() => setReachOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel={`Estimate: one dollar puts a message in front of about ${peoplePerDollar()} people. Learn how this is estimated.`}
-          style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.lg, backgroundColor: c.primarySoft, opacity: pressed ? 0.85 : 1 })}>
-          <T variant="display" color="primary" style={{ fontSize: 30 }}>
-            $1
+    <View style={{ gap: space.xxl }}>
+      {/* Hero: compact themed card with the faint swirl pattern */}
+      <View style={{ paddingHorizontal: space.lg, paddingTop: space.xs }}>
+        <View style={{ borderRadius: radius.xl, overflow: 'hidden', backgroundColor: c.surface, padding: space.lg + 2, gap: space.md, borderWidth: 1, borderColor: c.border }}>
+          <TigerPattern />
+          <T variant="overline" color="primary">
+            Community-funded reach
           </T>
-          <View style={{ flex: 1 }}>
-            <T variant="bodyStrong">≈ {peoplePerDollar()} people outside your network</T>
-            <T variant="small" color="textMuted">
-              Estimate from demo assumptions, not a guarantee. Tap to see how.
+          <T variant="title" style={{ fontSize: 26, lineHeight: 30 }}>
+            Help good messages travel further.
+          </T>
+          <T color="textMuted" style={{ fontSize: 14, lineHeight: 20 }}>
+            Back a campaign to show its message to people outside the creator’s network. You fund the reach, not the cause.
+          </T>
+          <Pressable
+            onPress={() => setReachOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Estimate: 100 rupees puts a message in front of about ${peoplePerHundred()} people. Learn how this is estimated.`}
+            hitSlop={6}
+            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.sm, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: c.primarySoft, opacity: pressed ? 0.8 : 1 })}>
+            <T variant="smallStrong" color="primary">
+              ₹100 ≈ {peoplePerHundred()} new people
             </T>
+            <T variant="small" color="textMuted" style={{ fontSize: 12 }}>
+              est.
+            </T>
+            <Icon name="information-circle-outline" size={14} color={c.primary} />
+          </Pressable>
+          <View style={{ flexDirection: 'row', gap: space.sm, marginTop: 2 }}>
+            <Pressable accessibilityRole="button" onPress={() => { haptic.light(); router.navigate('/explore'); }} style={({ pressed }) => ({ flex: 1, height: 44, borderRadius: radius.md, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
+              <T variant="bodyStrong" style={{ color: c.onPrimary }}>
+                Explore campaigns
+              </T>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={() => { haptic.light(); router.navigate('/create'); }} style={({ pressed }) => ({ flex: 1, height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
+              <T variant="bodyStrong">Start one</T>
+            </Pressable>
           </View>
-          <Icon name="information-circle-outline" size={20} color={c.primary} />
-        </Pressable>
-        <View style={{ gap: space.sm }}>
-          <Button label="Explore campaigns" size="lg" onPress={() => router.navigate('/explore')} />
-          <Button label="Start a campaign" size="lg" variant="secondary" onPress={() => router.navigate('/create')} />
         </View>
       </View>
       <ReachInfo visible={reachOpen} onClose={() => setReachOpen(false)} />
 
+      {/* Browse by cause: jumps to Explore already filtered */}
+      <View style={{ gap: space.md }}>
+        <Section title="Browse by cause" />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.xl, gap: 6 }}>
+          {CATEGORIES.map((cat) => (
+            <Pressable
+              key={cat}
+              accessibilityRole="button"
+              onPress={() => {
+                haptic.light();
+                router.navigate({ pathname: '/explore', params: { category: cat } });
+              }}
+              style={({ pressed }) => ({ height: 34, paddingHorizontal: 14, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, opacity: pressed ? 0.7 : 1 })}>
+              <T variant="smallStrong">{cat}</T>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+
       {/* Featured */}
-      <View style={{ marginTop: space.huge, gap: space.lg }}>
-        <View style={{ paddingHorizontal: space.xl }}>
-          <SectionTitle overline="Featured" title="Messages gaining momentum" action="See all" onAction={() => router.navigate('/explore')} />
-        </View>
+      <View style={{ gap: space.md }}>
+        <Section title="Gaining momentum" action="See all" onAction={() => router.navigate('/explore')} />
         {featured.isError ? (
-          <ErrorState message={(featured.error as Error).message} onRetry={() => featured.refetch()} />
+          <View style={{ paddingHorizontal: space.xl }}>
+            <ErrorState message={(featured.error as Error).message} onRetry={() => featured.refetch()} />
+          </View>
         ) : (
           <FlatList
             horizontal
             data={featured.data?.items ?? [null, null]}
             keyExtractor={(item, i) => item?.id ?? `s${i}`}
             showsHorizontalScrollIndicator={false}
-            snapToInterval={cardW + space.md}
+            snapToInterval={spotW + space.md}
             decelerationRate="fast"
             contentContainerStyle={{ paddingHorizontal: space.xl, gap: space.md }}
-            renderItem={({ item }) => <View style={{ width: cardW }}>{item ? <CampaignCard c={item} /> : <CardSkeleton />}</View>}
+            renderItem={({ item }) => (item ? <SpotlightCard c={item} width={spotW} height={176} /> : <Skeleton w={spotW} h={176} r={22} />)}
           />
         )}
       </View>
 
-      {/* How it works */}
-      <View style={{ marginTop: space.huge, paddingHorizontal: space.xl, gap: space.lg }}>
-        <SectionTitle overline="How it works" title="Create. Review. Amplify." />
-        <View>
+      {/* How it works: three numbered steps in one card */}
+      <View style={{ gap: space.md }}>
+        <Section title="How it works" action="Learn more" onAction={() => router.push('/info/how-it-works')} />
+        <View style={{ marginHorizontal: space.xl, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, padding: space.lg, gap: space.md }}>
           {STEPS.map((s, i) => (
-            <View key={s.title} style={{ flexDirection: 'row', gap: space.lg }}>
-              <View style={{ alignItems: 'center' }}>
-                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name={s.icon} size={20} color={c.primary} />
-                </View>
-                {i < STEPS.length - 1 && <View style={{ width: 2, flex: 1, backgroundColor: c.border, marginVertical: 4 }} />}
-              </View>
-              <View style={{ flex: 1, paddingBottom: space.xl, gap: 2 }}>
-                <T variant="overline" color="textMuted">
-                  {s.who}
+            <View key={s.title} style={{ flexDirection: 'row', gap: space.md, alignItems: 'flex-start' }}>
+              <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+                <T variant="smallStrong" color="primary">
+                  {i + 1}
                 </T>
-                <T variant="subheading">{s.title}</T>
-                <T color="textMuted">{s.body}</T>
+              </View>
+              <View style={{ flex: 1 }}>
+                <T variant="bodyStrong">
+                  {s.title}{' '}
+                  <T variant="small" color="textSubtle">
+                    · {s.who}
+                  </T>
+                </T>
+                <T variant="small" color="textMuted">
+                  {s.body}
+                </T>
               </View>
             </View>
           ))}
+          <View style={{ height: 1, backgroundColor: c.border }} />
+          <View style={{ gap: 2 }}>
+            <T variant="smallStrong">Why back a message instead of donating?</T>
+            <T variant="small" color="textMuted">
+              A donation pays for the cause’s costs. Backing pays for the message to reach new people, who may then support the cause. To fund the cause itself, donate to it directly.
+            </T>
+          </View>
         </View>
-        <Card style={{ gap: space.sm, backgroundColor: c.accentSoft, borderColor: c.accentSoft }}>
-          <T variant="overline" color="accent">
-            The fair question
-          </T>
-          <T variant="subheading">Why back a message instead of donating?</T>
-          <T color="textMuted">
-            A donation pays for rent, staff and supplies. Backing a campaign pays for the message to reach people who haven’t heard it yet, which can bring the cause new
-            supporters. If you want to fund the cause directly, donate to it directly.
-          </T>
-          <Button label="Read how funds are used" variant="ghost" size="sm" iconRight="arrow-forward" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} onPress={() => router.push('/info/how-it-works')} />
-        </Card>
       </View>
 
-      <View style={{ marginTop: space.huge, paddingHorizontal: space.xl }}>
-        <SectionTitle overline="Campaign feed" title="All campaigns" action="Search" onAction={() => router.navigate('/explore')} />
-      </View>
+      <Section title="All campaigns" action="Search" onAction={() => router.navigate({ pathname: '/explore', params: { focus: String(Date.now()) } })} />
     </View>
   );
 }
@@ -206,24 +229,31 @@ function HomeIntro({ featured }: { featured: ReturnType<typeof useCampaigns> }) 
 function HomeFooter({ loading, done, pageError, onRetry }: { loading: boolean; done: boolean; pageError: boolean; onRetry: () => void }) {
   const { c } = useTheme();
   return (
-    <View style={{ paddingHorizontal: space.xl, gap: space.xl }}>
-      {loading && <ActivityIndicator color={c.primary} style={{ paddingVertical: space.lg }} accessibilityLabel="Loading more campaigns" />}
+    <View style={{ paddingHorizontal: space.xl, gap: space.xl, paddingTop: space.sm }}>
+      {loading && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, paddingVertical: space.md }} accessibilityLiveRegion="polite">
+          <ActivityIndicator color={c.spinner} />
+          <T variant="small" color="textMuted">
+            Loading more campaigns…
+          </T>
+        </View>
+      )}
       {pageError && <Button label="Couldn’t load more. Try again" variant="secondary" icon="refresh" onPress={onRetry} />}
-      {done && (
+      {!!done && (
         <T variant="small" color="textSubtle" center>
           You’ve seen every campaign. Check back soon.
         </T>
       )}
-      <Card style={{ alignItems: 'center', gap: space.md, paddingVertical: space.xxl }}>
-        <T variant="heading" center>
-          Have a message that should travel further?
-        </T>
-        <T color="textMuted" center>
-          Nonprofits, creators, businesses and community groups can create a campaign in five steps.
-        </T>
-        <Button label="Start a campaign" icon="add" onPress={() => router.navigate('/create')} />
-      </Card>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.lg }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.lg, backgroundColor: c.primarySoft }}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <T variant="bodyStrong">Have a message that should travel further?</T>
+          <T variant="small" color="textMuted">
+            Create a campaign in five steps.
+          </T>
+        </View>
+        <Button label="Start" size="sm" onPress={() => router.navigate('/create')} />
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.lg, rowGap: space.sm }}>
         {[
           ['About', 'about'],
           ['Partners', 'partners'],

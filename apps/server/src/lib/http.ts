@@ -24,6 +24,8 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   if (err instanceof ZodError) {
     return res.status(400).json({ error: 'Invalid request', details: err.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) });
   }
+  // Malformed ObjectId in a URL or body: the record can't exist.
+  if ((err as { code?: string })?.code === 'P2023') return res.status(404).json({ error: 'Not found' });
   if (err instanceof HttpError) {
     return res.status(err.status).json({ error: err.message, details: err.details });
   }

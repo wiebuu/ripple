@@ -41,6 +41,8 @@ type Seed = {
 };
 
 const base = emptyDraft();
+/** Sample amounts below are written in round numbers and scaled to rupees. */
+const INR = 80;
 
 const seeds: Seed[] = [
   {
@@ -351,7 +353,7 @@ const seeds: Seed[] = [
 
 async function main() {
   await db.$transaction([
-    db.notification.deleteMany(), db.feedback.deleteMany(), db.follow.deleteMany(), db.save.deleteMany(),
+    db.notification.deleteMany(), db.complaint.deleteMany(), db.feedback.deleteMany(), db.follow.deleteMany(), db.save.deleteMany(),
     db.report.deleteMany(), db.campaignUpdate.deleteMany(), db.reviewDecision.deleteMany(), db.contribution.deleteMany(),
     db.campaign.deleteMany(), db.user.deleteMany(),
   ]);
@@ -366,7 +368,9 @@ async function main() {
   const ids: Record<string, string> = {};
 
   for (const s of seeds) {
-    const content: DraftContent = { ...base, ...s.content, goal: s.goal, acceptedRules: s.status !== 'DRAFT' };
+    const goal = s.goal * INR;
+    const raised = s.raised * INR;
+    const content: DraftContent = { ...base, ...s.content, goal, acceptedRules: s.status !== 'DRAFT' };
     const live = !['DRAFT', 'SUBMITTED', 'CHANGES_REQUESTED', 'REJECTED'].includes(s.status);
     const publishedAt = live ? new Date(now - (s.publishedDaysAgo ?? 10) * day) : null;
     const submittedAt = s.status !== 'DRAFT' ? new Date((publishedAt?.getTime() ?? now) - 2 * day) : null;
@@ -374,8 +378,8 @@ async function main() {
       data: {
         slug: s.slug, ownerId: s.owner === 'alex' ? alex.id : community.id, status: s.status, featured: !!s.featured, isDemo: true,
         title: content.basics.title, summary: content.basics.summary, category: content.basics.category, creatorName: content.basics.creatorName,
-        creatorType: content.basics.creatorType, coverImage: content.visuals.coverImage ?? '', content: content as any, goal: s.goal,
-        raised: s.raised, backerCount: s.backers, submittedAt, publishedAt,
+        creatorType: content.basics.creatorType, coverImage: content.visuals.coverImage ?? '', content: content as any, goal,
+        raised, backerCount: s.backers, submittedAt, publishedAt,
         endsAt: publishedAt ? new Date(publishedAt.getTime() + 30 * day) : null,
         budgetApproved: ['DISTRIBUTION_PREP', 'PROMOTING', 'COMPLETED'].includes(s.status),
         adSetupReady: ['PROMOTING', 'COMPLETED'].includes(s.status),
@@ -425,7 +429,8 @@ async function main() {
   });
 
   // Alex as a backer: payment history with one failure.
-  const mk = async (slug: string, amount: number, status: string, daysAgo: number, user = alex, show = false, failure?: string) => {
+  const mk = async (slug: string, usdAmount: number, status: string, daysAgo: number, user = alex, show = false, failure?: string) => {
+    const amount = usdAmount * INR;
     const c = await db.campaign.findUniqueOrThrow({ where: { id: ids[slug] } });
     const f = feeBreakdown(amount);
     await db.contribution.create({
@@ -433,7 +438,7 @@ async function main() {
         campaignId: c.id, userId: user.id, amount, platformFee: f.platformFee, processingFee: f.processingFee, total: f.total,
         estimatedReach: estimateReach(amount, channelFactor((c.content as any).reach.channels)), status, failureReason: failure ?? null,
         showName: show, displayName: show ? user.name : null, receiptNo: `RC-DEMO-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-        cardLast4: status === 'FAILED' ? '0002' : '4242', createdAt: new Date(now - daysAgo * day),
+        provider: 'RAZORPAY_TEST', cardLast4: null, createdAt: new Date(now - daysAgo * day),
       },
     });
   };
@@ -460,17 +465,16 @@ async function main() {
   const notes: [string, string, string, string | null, number, boolean][] = [
     ['REVIEW', 'Changes requested', 'A reviewer asked for edits to "Recycling that actually gets recycled": one source link is broken.', ids['recycling-that-gets-recycled'], 0.2, false],
     ['SUBMISSION', 'Submission received', '"Fresh produce at every corner store" is in the review queue. We usually respond within 1–2 business days.', ids['fresh-produce-corner-stores'], 0.6, false],
-    ['MILESTONE', '75% funded', '"The free crisis line most people don’t know exists" has raised $3,780 of $5,000.', ids['free-mental-health-line'], 1, false],
+    ['MILESTONE', '75% funded', '"The free crisis line most people don’t know exists" has raised ₹3,02,400 of ₹4,00,000.', ids['free-mental-health-line'], 1, false],
     ['PROMOTION', 'Distribution update', '"Plant shade trees on the hottest blocks first" has been shown to new audiences in Phoenix. See the report.', ids['shade-trees-hottest-blocks'], 1.5, true],
     ['UPDATE', 'Update: Keep the winter shelter open past 7am', 'Council vote scheduled for 12 December', ids['winter-shelter-hours'], 2, true],
-    ['DEADLINE', 'Funding closes in 6 days', '"Keep the winter shelter open past 7am" is $120 from its goal.', ids['winter-shelter-hours'], 2.5, true],
     ['CONTRIBUTION', 'Payment unsuccessful', 'Your card was declined for "Library hours that fit working parents". No money was taken.', ids['library-hours-working-parents'], 2, true],
-    ['CONTRIBUTION', 'Contribution confirmed', '$25.00 toward distributing "Redraw the bus network around where people actually work".', ids['redraw-the-bus-network'], 7, true],
+    ['CONTRIBUTION', 'Contribution confirmed', '₹2,000.00 toward distributing "Redraw the bus network around where people actually work".', ids['redraw-the-bus-network'], 7, true],
     ['REPORT', 'Final report available', '"Turn one cleanup day into a monthly habit" finished distribution. See where the money went.', ids['beach-cleanup-habit'], 30, true],
     ['SECURITY', 'New sign-in', 'Your account was signed in on a new device. If this was not you, contact support.', null, 12, true],
   ];
   for (const [kind, title, body, campaignId, daysAgo, read] of notes) {
-    await db.notification.create({ data: { userId: alex.id, kind, title, body, campaignId, read, createdAt: new Date(now - daysAgo * day) } });
+    await db.notification.create({ data: { userId: alex.id, kind, title, body, campaignId, read, dedupeKey: `seed:${title}:${daysAgo}`, createdAt: new Date(now - daysAgo * day) } });
   }
 
   console.log(`Seeded ${seeds.length} campaigns. Demo creator: alex@demo.campaigns · Reviewer: review@demo.campaigns`);

@@ -6,16 +6,28 @@
 export const REACH_CONFIG = {
   /** Share of each contribution kept by the platform for review, setup and reporting. */
   platformFeeRate: 0.08,
-  /** Simulated card processing fee paid on top by the backer. */
-  processingRate: 0.029,
-  processingFixed: 0.3,
-  /** Assumed people reached per advertising dollar (blended CPM across channels). */
-  peoplePerAdDollar: 29.3,
-  /** Contributions below this are rejected by the server. */
-  minContribution: 1,
-  maxContribution: 10000,
-  presets: [5, 10, 25, 50, 100],
+  /** Payment processing fee (Razorpay standard rate), paid on top by the backer. */
+  processingRate: 0.02,
+  processingFixed: 0,
+  /** Assumed people reached per advertising rupee (blended CPM across channels). */
+  peoplePerAdRupee: 0.35,
+  /** Contribution limits in rupees. */
+  minContribution: 50,
+  maxContribution: 500000,
+  presets: [100, 250, 500, 1000, 2500],
 } as const;
+
+/** All money in Ripple is in Indian rupees; payments are processed by Razorpay (test mode). */
+export const PAYMENT_CONFIG = {
+  currency: 'INR',
+  /** Typical per-payment UPI limit. Larger payments should use a card. */
+  upiLimit: 100000,
+} as const;
+
+/** Razorpay expects amounts in paise. */
+export function toPaise(inr: number) {
+  return Math.round(inr * 100);
+}
 
 export const CHANNELS = [
   { key: 'social_feed', label: 'Social feeds', factor: 1.1, note: 'Image and short video placements in social feeds' },
@@ -48,11 +60,12 @@ export function feeBreakdown(amount: number) {
 /** Estimated people reached for a gross contribution or goal. */
 export function estimateReach(amount: number, factor = 1) {
   const { adBudget } = feeBreakdown(amount);
-  return Math.round(adBudget * REACH_CONFIG.peoplePerAdDollar * factor);
+  return Math.round(adBudget * REACH_CONFIG.peoplePerAdRupee * factor);
 }
 
-export function peoplePerDollar(factor = 1) {
-  return estimateReach(1, factor);
+/** People reached per ₹100 contributed (estimate). */
+export function peoplePerHundred(factor = 1) {
+  return estimateReach(100, factor);
 }
 
 export function formatReach(n: number) {
@@ -62,12 +75,12 @@ export function formatReach(n: number) {
   return `${n}`;
 }
 
-export function formatMoney(n: number, cents = false) {
+export function formatMoney(n: number, paise = false) {
   return (
-    '$' +
-    n.toLocaleString('en-US', {
-      minimumFractionDigits: cents ? 2 : 0,
-      maximumFractionDigits: cents ? 2 : 0,
+    '₹' +
+    n.toLocaleString('en-IN', {
+      minimumFractionDigits: paise ? 2 : 0,
+      maximumFractionDigits: paise ? 2 : 0,
     })
   );
 }

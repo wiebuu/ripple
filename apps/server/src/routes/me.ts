@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { requireAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import { ah } from '../lib/http';
@@ -24,12 +25,14 @@ me.get(
 me.get(
   '/contributions',
   ah(async (req, res) => {
-    const rows = await db.contribution.findMany({
-      where: { userId: req.user!.id, NOT: { status: 'PENDING', cardLast4: null } },
-      orderBy: { createdAt: 'desc' },
-      include: { campaign: { select: { title: true, coverImage: true } } },
-    });
-    res.json({ items: rows.map(toContribution) });
+    const { limit, offset } = z.object({ limit: z.coerce.number().int().min(1).max(50).default(15), offset: z.coerce.number().int().min(0).default(0) }).parse(req.query);
+    // Pending rows without a card are abandoned checkouts; they never appear in history.
+    const where = { userId: req.user!.id, NOT: { status: 'PENDING', cardLast4: null } };
+    const [rows, total] = await Promise.all([
+      db.contribution.findMany({ where, orderBy: { createdAt: 'desc' }, take: limit, skip: offset, include: { campaign: { select: { title: true, coverImage: true } } } }),
+      db.contribution.count({ where }),
+    ]);
+    res.json({ items: rows.map(toContribution), total, nextOffset: offset + rows.length < total ? offset + rows.length : null });
   }),
 );
 

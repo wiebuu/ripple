@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { channelFactor, estimateReach, feeBreakdown, formatMoney, validateContributionAmount } from '../../../../shared';
+import crypto from 'node:crypto';
+import { BACKABLE_STATUSES, PAYMENT_CONFIG, channelFactor, type CampaignStatus, estimateReach, feeBreakdown, formatMoney, toPaise, validateContributionAmount } from '../../../../shared';
+import { env } from '../lib/env';
 import { requireAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import { ah, forbidden, HttpError, notFound } from '../lib/http';
@@ -13,8 +15,8 @@ export const contributions = Router();
 contributions.use(requireAuth);
 
 /**
- * Simulated payment provider. No real card data is stored or sent anywhere;
- * only the last four digits are kept for the receipt.
+ * Test-card gateway for the automated API tests only (ALLOW_SIMULATED_PAYMENTS=1).
+ * The app pays exclusively through Razorpay test mode.
  */
 const TEST_CARDS: Record<string, { outcome: 'SUCCEEDED' | 'FAILED' | 'PENDING'; reason?: string }> = {
   '4242424242424242': { outcome: 'SUCCEEDED' },
@@ -40,12 +42,13 @@ contributions.post(
         receiptEmail: z.email().optional(),
       })
       .parse(req.body);
-    const err = validateContributionAmount(body.amount);
-    if (err) throw new HttpError(400, err);
     const c = await db.campaign.findUnique({ where: { id: body.campaignId } });
     if (!c) throw notFound('Campaign');
-    if (c.status !== 'FUNDING') throw new HttpError(409, 'This campaign is not accepting contributions right now');
+    if (!BACKABLE_STATUSES.includes(c.status as CampaignStatus)) throw new HttpError(409, 'This campaign is not accepting contributions right now');
     if (c.endsAt && c.endsAt < new Date()) throw new HttpError(409, 'The funding period for this campaign has ended');
+    // Going past the goal is allowed: extra funds buy more reach.
+    const err = validateContributionAmount(body.amount);
+    if (err) throw new HttpError(400, err);
 
     const fees = feeBreakdown(body.amount);
     const k = await db.contribution.create({
@@ -105,10 +108,11 @@ async function settle(id: string) {
   if (c.goal && c.raised >= c.goal && c.status === 'FUNDING') await transition(c.id, 'FUNDED', null, { note: 'Funding goal reached' });
 }
 
-/** Step 2: simulated checkout. */
+/** Test-suite checkout. Disabled unless ALLOW_SIMULATED_PAYMENTS=1. */
 contributions.post(
   '/:id/pay',
   ah(async (req, res) => {
+    if (!env.allowSimulatedPayments) throw new HttpError(410, 'Payments are processed through Razorpay test mode.');
     const { cardNumber, expiry, cvc, name } = z
       .object({
         cardNumber: z.string().transform((s) => s.replace(/\s+/g, '')),
@@ -148,6 +152,7 @@ contributions.post(
 contributions.post(
   '/:id/confirm',
   ah(async (req, res) => {
+    if (!env.allowSimulatedPayments) throw new HttpError(410, 'Payments are processed through Razorpay test mode.');
     const { approve } = z.object({ approve: z.boolean() }).parse(req.body);
     const k = await ownContribution(req.user!.id, req.params.id);
     if (k.status !== 'PENDING' || !k.cardLast4) throw new HttpError(409, 'Nothing to confirm');
@@ -163,6 +168,77 @@ contributions.post(
     const k = await ownContribution(req.user!.id, req.params.id);
     if (k.status !== 'PENDING') throw new HttpError(409, 'Only pending payments can be cancelled');
     await db.contribution.update({ where: { id: k.id }, data: { status: 'CANCELLED', failureReason: 'You cancelled this payment.' } });
+    res.json(await result(k.id));
+  }),
+);
+
+/* ---------------- Razorpay (TEST MODE ONLY) ----------------
+ * Flow: create an order on the server → the app opens Razorpay Checkout →
+ * the server verifies the HMAC signature before marking the payment paid.
+ * env.razorpay is null unless the key is an rzp_test_ key.
+ */
+function razorpay() {
+  if (!env.razorpay) throw new HttpError(503, 'Payments are unavailable: Razorpay test mode is not configured on the server.');
+  return env.razorpay;
+}
+
+async function razorpayApi<T>(path: string, init: { method?: string; body?: unknown } = {}) {
+  const { keyId, keySecret } = razorpay();
+  const r = await fetch(`https://api.razorpay.com/v1${path}`, {
+    method: init.method ?? 'GET',
+    headers: { 'content-type': 'application/json', authorization: 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64') },
+    body: init.body ? JSON.stringify(init.body) : undefined,
+  });
+  const json = (await r.json().catch(() => ({}))) as T & { error?: { description?: string } };
+  if (!r.ok) throw new HttpError(502, `Payment provider error: ${json.error?.description ?? r.status}`);
+  return json;
+}
+
+contributions.post(
+  '/:id/razorpay/order',
+  ah(async (req, res) => {
+    const { keyId } = razorpay();
+    const k = await ownContribution(req.user!.id, req.params.id);
+    if (k.status !== 'PENDING') throw new HttpError(409, 'This payment has already been processed');
+    const amount = toPaise(k.total);
+    const order = await razorpayApi<{ id: string; amount: number; currency: string }>('/orders', {
+      method: 'POST',
+      body: { amount, currency: PAYMENT_CONFIG.currency, receipt: k.receiptNo, notes: { contributionId: k.id, purpose: 'Campaign message distribution (not a donation)' } },
+    });
+    await db.contribution.update({ where: { id: k.id }, data: { provider: 'RAZORPAY_TEST', providerOrderId: order.id } });
+    res.json({ keyId, orderId: order.id, amount: order.amount, currency: order.currency, campaignTitle: k.campaign.title, receiptEmail: k.receiptEmail });
+  }),
+);
+
+contributions.post(
+  '/:id/razorpay/verify',
+  ah(async (req, res) => {
+    const { keySecret } = razorpay();
+    const body = z.object({ razorpay_order_id: z.string(), razorpay_payment_id: z.string(), razorpay_signature: z.string() }).parse(req.body);
+    const k = await ownContribution(req.user!.id, req.params.id);
+    if (!k.providerOrderId || k.providerOrderId !== body.razorpay_order_id) throw new HttpError(400, 'Order does not match this payment');
+    // Signature = HMAC_SHA256(order_id + "|" + payment_id, key_secret). Never trust the client's word for success.
+    const expected = crypto.createHmac('sha256', keySecret).update(`${body.razorpay_order_id}|${body.razorpay_payment_id}`).digest('hex');
+    const a = Buffer.from(expected);
+    const b = Buffer.from(body.razorpay_signature);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) throw new HttpError(400, 'Payment signature could not be verified');
+    const payment = await razorpayApi<{ status: string; card?: { last4?: string } }>(`/payments/${body.razorpay_payment_id}`);
+    if (!['captured', 'authorized'].includes(payment.status)) throw new HttpError(409, `Payment is ${payment.status}`);
+    await db.contribution.update({ where: { id: k.id }, data: { providerPaymentId: body.razorpay_payment_id, cardLast4: payment.card?.last4 ?? 'RZPY' } });
+    await settle(k.id);
+    res.json(await result(k.id));
+  }),
+);
+
+contributions.post(
+  '/:id/razorpay/failed',
+  ah(async (req, res) => {
+    const { reason } = z.object({ reason: z.string().max(300).optional() }).parse(req.body);
+    const k = await ownContribution(req.user!.id, req.params.id);
+    if (k.status === 'PENDING') {
+      await db.contribution.update({ where: { id: k.id }, data: { status: 'FAILED', cardLast4: k.cardLast4 ?? 'RZPY', failureReason: `${reason ?? 'The payment was declined'}. No money was taken.` } });
+      await notify(req.user!.id, { kind: 'CONTRIBUTION', title: 'Payment unsuccessful', campaignId: k.campaignId, dedupeKey: `kf:${k.id}`, body: 'Your Razorpay test payment did not go through. You can try again.' });
+    }
     res.json(await result(k.id));
   }),
 );

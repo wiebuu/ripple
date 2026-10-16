@@ -1,6 +1,8 @@
 import { QueryClient, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AppNotification,
+  BackerActivity,
+  Complaint,
   CampaignDetail,
   CampaignStatus,
   CampaignSummary,
@@ -59,7 +61,7 @@ export function useInfiniteCampaigns(p: Omit<ListParams, 'limit'> = {}) {
   };
 }
 
-export type Detail = CampaignDetail & { hasPendingRevision?: boolean };
+export type Detail = CampaignDetail & { hasPendingRevision?: boolean; backerActivity?: BackerActivity };
 export const useCampaign = (id?: string) =>
   useQuery({ queryKey: ['campaign', id], queryFn: () => api<Detail>(`/campaigns/${id}`), enabled: !!id });
 
@@ -74,8 +76,53 @@ export type MyCampaign = CampaignSummary & { hasPendingRevision: boolean; latest
 export const useMyCampaigns = () =>
   useQuery({ queryKey: ['me', 'campaigns'], queryFn: () => api<{ items: MyCampaign[] }>('/me/campaigns') });
 
-export const useMyContributions = () =>
-  useQuery({ queryKey: ['me', 'contributions'], queryFn: () => api<{ items: Contribution[] }>('/me/contributions') });
+/** Generic offset-paginated list for user-specific endpoints. */
+function useInfiniteList<T>(key: unknown[], path: string, enabled = true) {
+  const q = useInfiniteQuery({
+    queryKey: key,
+    initialPageParam: 0,
+    enabled,
+    queryFn: ({ pageParam }) => api<{ items: T[]; total: number; nextOffset: number | null; unread?: number }>(`${path}${path.includes('?') ? '&' : '?'}limit=15&offset=${pageParam}`),
+    getNextPageParam: (last) => last.nextOffset ?? undefined,
+  });
+  return {
+    ...q,
+    items: q.data?.pages.flatMap((p) => p.items) ?? [],
+    loadMore: () => {
+      if (q.hasNextPage && !q.isFetchingNextPage && !q.isError) q.fetchNextPage();
+    },
+  };
+}
+
+export const useMyContributions = () => useInfiniteList<Contribution>(['me', 'contributions'], '/me/contributions');
+
+export const useNotificationFeed = (scope: 'all' | 'following' = 'all') => {
+  const token = useSession((s) => s.token);
+  return useInfiniteList<AppNotification>(['notifications', 'feed', scope, token], `/notifications?scope=${scope}`, !!token);
+};
+
+/** Follow/unfollow from a list card, updating every cached list that contains the campaign. */
+export function useFollowCampaign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, on }: { id: string; on: boolean }) => api(`/campaigns/${id}/follow`, { body: { on } }),
+    onMutate: ({ id, on }) => {
+      const patch = (c: CampaignSummary) => (c.id === id ? { ...c, isFollowing: on } : c);
+      qc.setQueriesData<any>({ queryKey: ['campaigns'] }, (old: any) => {
+        if (!old) return old;
+        if (old.pages) return { ...old, pages: old.pages.map((p: any) => ({ ...p, items: p.items.map(patch) })) };
+        if (old.items) return { ...old, items: old.items.map(patch) };
+        return old;
+      });
+      qc.setQueryData<Detail>(['campaign', id], (d) => d && { ...d, isFollowing: on });
+    },
+    onSettled: (_r, _e, { id }) => {
+      qc.invalidateQueries({ queryKey: ['me', 'following'] });
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['campaign', id] });
+    },
+  });
+}
 
 export const useBacked = () =>
   useQuery({ queryKey: ['me', 'backed'], queryFn: () => api<{ items: (CampaignSummary & { myTotal: number })[] }>('/me/backed') });
@@ -88,7 +135,7 @@ export const useNotifications = () => {
   const token = useSession((s) => s.token);
   return useQuery({
     queryKey: ['notifications', token],
-    queryFn: () => api<{ items: AppNotification[]; unread: number }>('/notifications'),
+    queryFn: () => api<{ items: AppNotification[]; unread: number }>('/notifications?limit=1'),
     enabled: !!token,
     refetchInterval: 30_000,
   });
@@ -97,7 +144,7 @@ export const useNotifications = () => {
 export const usePrefs = () => useQuery({ queryKey: ['prefs'], queryFn: () => api<NotificationPrefs>('/notifications/prefs') });
 
 export const useConfig = () =>
-  useQuery({ queryKey: ['config'], queryFn: () => api<{ aiEnabled: boolean }>('/config', { auth: false }), staleTime: Infinity });
+  useQuery({ queryKey: ['config'], queryFn: () => api<{ aiEnabled: boolean; googleSignIn: boolean; payments: { provider: 'razorpay-test' | 'none'; keyId?: string } }>('/config', { auth: false }), staleTime: 60_000 });
 
 export type DraftResponse = CampaignSummary & { content: DraftContent; latestReviewNote: string | null };
 export const useDraft = (id?: string) =>
@@ -126,7 +173,7 @@ export function invalidateCampaign(id: string) {
   queryClient.invalidateQueries({ queryKey: ['review'] });
 }
 
-export type ReviewItem = CampaignSummary & { hasPendingRevision: boolean; budgetApproved: boolean; adSetupReady: boolean };
+export type ReviewItem = CampaignSummary & { hasPendingRevision: boolean; openReports: number; budgetApproved: boolean; adSetupReady: boolean };
 export const useReviewQueue = () =>
   useQuery({ queryKey: ['review', 'queue'], queryFn: () => api<{ items: ReviewItem[] }>('/review/queue') });
 
@@ -139,6 +186,7 @@ export type ReviewDetail = CampaignSummary & {
   audit: { id: string; action: string; fromStatus: CampaignStatus | null; toStatus: CampaignStatus; note: string | null; actorName: string | null; createdAt: string }[];
   report: CampaignDetail['report'];
   feedback: { visuals: { answer: string; count: number }[]; mindChanged: { answer: string; count: number }[] };
+  complaints: Complaint[];
 };
 export const useReviewDetail = (id?: string) =>
   useQuery({ queryKey: ['review', id], queryFn: () => api<ReviewDetail>(`/review/campaigns/${id}`), enabled: !!id });

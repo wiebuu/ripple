@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Linking, View } from 'react-native';
-import { REACH_CONFIG, feeBreakdown, peoplePerDollar } from '@shared';
+import { REACH_CONFIG, feeBreakdown, peoplePerHundred } from '@shared';
 import { Accordion } from '@/components/Accordion';
 import { Body, Header } from '@/components/Screen';
 import { Button, Card, ListRow, T } from '@/components/ui';
@@ -11,12 +11,12 @@ type Section = { heading?: string; body: string[] };
 type Page = { title: string; intro?: string; sections?: Section[]; faq?: { q: string; a: string }[] };
 
 const fee = Math.round(REACH_CONFIG.platformFeeRate * 100);
-const f10 = feeBreakdown(10);
+const f10 = feeBreakdown(500);
 
 const PAGES: Record<string, Page> = {
   about: {
     title: 'About',
-    intro: 'Campaigns is a community-funded media platform. We help important messages travel beyond the networks of the people who create them.',
+    intro: 'Ripple is a community-funded media platform. We help important messages travel beyond the networks of the people who create them.',
     sections: [
       { heading: 'Why we exist', body: ['Good information often stays inside the circle that already agrees with it. Advertising can reach new people, but it is expensive for individuals and small groups.', 'We let many people chip in small amounts so a reviewed, sourced message can be shown to audiences who would not otherwise see it.'] },
       { heading: 'What we are not', body: ['We are not a donation platform. Contributions pay for distributing a message, not for the cause, person or organisation it describes. Funds are never transferred to creators.'] },
@@ -30,7 +30,7 @@ const PAGES: Record<string, Page> = {
       { heading: '2. Review', body: ['Our team checks claims against the listed sources, checks images and ads against advertising policies, and confirms targeting is appropriate. We can approve, ask for changes, or decline.', 'Only approved campaigns are published and open for backing.'] },
       { heading: '3. Amplify', body: [`Backers contribute toward the goal. ${fee}% covers review, ad setup and reporting; the rest is spent on advertising. When funding closes, we prepare the ads with distribution partners and launch them.`, 'Reaching the goal does not launch ads by itself. Ads start only when approval, payment, budget and ad setup are all complete.'] },
       { heading: 'After the campaign', body: ['Creators and backers receive a report showing funds raised, ad spend, impressions, measured reach and clicks, kept separate from the original estimate.'] },
-      { heading: 'About reach estimates', body: [`Before a campaign runs we can only estimate reach. Our demo model assumes about ${peoplePerDollar()} people per dollar contributed. It is not a guarantee: actual reach depends on ad inventory, prices, targeting, delivery and performance.`] },
+      { heading: 'About reach estimates', body: [`Before a campaign runs we can only estimate reach. Our demo model assumes about ${peoplePerHundred()} people per ₹100 contributed. It is not a guarantee: actual reach depends on ad inventory, prices, targeting, delivery and performance.`] },
     ],
   },
   partners: {
@@ -46,7 +46,7 @@ const PAGES: Record<string, Page> = {
     title: 'FAQs',
     faq: [
       { q: 'Is my contribution a donation?', a: 'No. It pays to show the campaign’s message to more people. It does not go to the cause or the creator. If you want to support the cause directly, donate to it directly.' },
-      { q: 'Where does my money go?', a: `For every $10: ${formatMoney(f10.adBudget, true)} buys advertising and ${formatMoney(f10.platformFee, true)} covers review, ad setup and reporting. Card processing (${formatMoney(f10.processingFee, true)}) is added at checkout.` },
+      { q: 'Where does my money go?', a: `For every ₹500: ${formatMoney(f10.adBudget, true)} buys advertising and ${formatMoney(f10.platformFee, true)} covers review, ad setup and reporting. Card processing (${formatMoney(f10.processingFee, true)}) is added at checkout.` },
       { q: 'Do I need an account?', a: 'No. You can browse and back campaigns as a guest. You get a receipt either way.' },
       { q: 'Will my name be public?', a: 'Not unless you choose to. Backer names are private by default, and amounts are never shown publicly.' },
       { q: 'What if the goal isn’t reached?', a: 'The team either runs a smaller campaign with what was raised or refunds backers. You’ll be notified either way.' },
@@ -62,7 +62,7 @@ const PAGES: Record<string, Page> = {
   contact: {
     title: 'Contact',
     intro: 'We usually reply within one business day.',
-    sections: [{ heading: 'Email', body: ['support@campaigns.example'] }, { heading: 'Report a campaign', body: ['Use “Report” on any campaign page, or email reports@campaigns.example with the campaign link.'] }],
+    sections: [{ heading: 'Email', body: ['support@ripple.example'] }, { heading: 'Report a campaign', body: ['Use “Report” on any campaign page, or email reports@ripple.example with the campaign link.'] }],
   },
   terms: {
     title: 'Terms & funding policy',
@@ -108,7 +108,7 @@ export default function InfoPage() {
     <View style={{ flex: 1 }}>
       <Header title={p.title} />
       <Body>
-        {p.intro && (
+        {!!p.intro && (
           <T variant="reading" style={{ fontSize: 19 }}>
             {p.intro}
           </T>
@@ -123,7 +123,7 @@ export default function InfoPage() {
             ))}
           </View>
         ))}
-        {p.faq && (
+        {!!p.faq && (
           <Card padded={false} style={{ paddingHorizontal: space.lg }}>
             {p.faq.map((x, i) => (
               <Accordion key={x.q} title={x.q} last={i === p.faq!.length - 1}>
@@ -140,7 +140,7 @@ export default function InfoPage() {
             <ListRow icon="mail-outline" title="Contact us" onPress={() => router.push('/info/contact')} />
           </Card>
         )}
-        {page === 'contact' && <Button label="Email support" icon="mail-outline" onPress={() => Linking.openURL('mailto:support@campaigns.example')} />}
+        {page === 'contact' && <Button label="Email support" icon="mail-outline" onPress={() => Linking.openURL('mailto:support@ripple.example')} />}
       </Body>
     </View>
   );

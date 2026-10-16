@@ -14,10 +14,25 @@ const DEFAULT_PREFS = { ...Object.fromEntries(KINDS.map((k) => [k, true])), emai
 notifications.get(
   '/',
   ah(async (req, res) => {
-    const items = await db.notification.findMany({ where: { userId: req.user!.id }, orderBy: { createdAt: 'desc' }, take: 100 });
+    const { limit, offset, scope } = z
+      .object({ limit: z.coerce.number().int().min(1).max(50).default(15), offset: z.coerce.number().int().min(0).default(0), scope: z.enum(['all', 'following']).default('all') })
+      .parse(req.query);
+    // "following": only notifications about campaigns the user follows (not their own).
+    const followedIds =
+      scope === 'following'
+        ? (await db.follow.findMany({ where: { userId: req.user!.id, campaign: { ownerId: { not: req.user!.id } } }, select: { campaignId: true } })).map((f) => f.campaignId)
+        : null;
+    const where = { userId: req.user!.id, ...(followedIds && { campaignId: { in: followedIds } }) };
+    const [items, total, unread] = await Promise.all([
+      db.notification.findMany({ where, orderBy: { createdAt: 'desc' }, take: limit, skip: offset }),
+      db.notification.count({ where }),
+      db.notification.count({ where: { userId: req.user!.id, read: false } }),
+    ]);
     res.json({
       items: items.map((n) => ({ id: n.id, kind: n.kind, title: n.title, body: n.body, campaignId: n.campaignId, read: n.read, createdAt: n.createdAt.toISOString() })),
-      unread: items.filter((n) => !n.read).length,
+      total,
+      unread,
+      nextOffset: offset + items.length < total ? offset + items.length : null,
     });
   }),
 );

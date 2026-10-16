@@ -92,6 +92,8 @@ export type CampaignSummary = {
   endsAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Present on list responses for signed-in users. */
+  isFollowing?: boolean;
 };
 
 export type CampaignDetail = CampaignSummary & {
@@ -186,6 +188,33 @@ export type User = {
   email: string | null;
   role: 'USER' | 'REVIEWER';
   isGuest: boolean;
+};
+
+export const COMPLAINT_REASONS = [
+  { key: 'MISLEADING', label: 'Misleading or false claims' },
+  { key: 'SOURCES', label: 'Sources don’t support the claims' },
+  { key: 'HATE', label: 'Hate, harassment or violence' },
+  { key: 'PRIVATE_PERSON', label: 'Targets a private person' },
+  { key: 'COPYRIGHT', label: 'Uses images or content without permission' },
+  { key: 'SPAM', label: 'Spam or scam' },
+  { key: 'OTHER', label: 'Something else' },
+] as const;
+export type ComplaintReason = (typeof COMPLAINT_REASONS)[number]['key'];
+
+export type Complaint = {
+  id: string;
+  campaignId: string;
+  campaignTitle: string;
+  reason: ComplaintReason;
+  details: string | null;
+  status: 'OPEN' | 'RESOLVED' | 'DISMISSED';
+  resolution: string | null;
+  createdAt: string;
+};
+
+export type BackerActivity = {
+  recent: { amount: number; name: string; at: string }[];
+  daily: { day: string; amount: number; count: number }[];
 };
 
 export type Paged<T> = { items: T[]; total: number };

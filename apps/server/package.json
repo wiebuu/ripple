@@ -8,14 +8,16 @@
     "db:push": "prisma db push --skip-generate",
     "setup": "prisma generate && prisma db push --skip-generate && tsx src/seed.ts",
     "typecheck": "tsc --noEmit",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "db:local": "mkdir -p .mongo-data && mongod --replSet rs0 --dbpath .mongo-data --port 27018 --bind_ip 127.0.0.1 --quiet",
+    "db:init": "mongosh --quiet --port 27018 --eval \"try { rs.status().ok } catch (e) { rs.initiate({ _id: \\\"rs0\\\", members: [{ _id: 0, host: \\\"127.0.0.1:27018\\\" }] }).ok }\""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.135.0",
+    "@google/genai": "^2.30.0",
     "@prisma/client": "^6.19.3",
     "cors": "^2.8.6",
     "dotenv": "^18.0.8",

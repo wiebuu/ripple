@@ -3,7 +3,7 @@
  * (authoritative check on submit). Returns a map of field path -> message.
  */
 import { CATEGORIES, type DraftContent } from './types';
-import { REACH_CONFIG } from './reach';
+import { REACH_CONFIG, formatMoney } from './reach';
 
 export type Errors = Record<string, string>;
 
@@ -12,8 +12,8 @@ export const SUMMARY_MAX = 200;
 export const AD_HEADLINE_MAX = 40;
 export const AD_DESCRIPTION_MAX = 125;
 export const CTA_MAX = 20;
-export const GOAL_MIN = 250;
-export const GOAL_MAX = 100000;
+export const GOAL_MIN = 10000;
+export const GOAL_MAX = 5000000;
 
 export const STEPS = ['Basics', 'Story', 'Visuals', 'Reach', 'Submit'] as const;
 export type StepKey = (typeof STEPS)[number];
@@ -76,8 +76,8 @@ export function validateReach(d: DraftContent): Errors {
 export function validateSubmit(d: DraftContent): Errors {
   const e: Errors = {};
   if (d.goal == null || Number.isNaN(d.goal)) e['goal'] = 'Set a funding goal.';
-  else if (d.goal < GOAL_MIN) e['goal'] = `The minimum goal is $${GOAL_MIN}, enough for a meaningful test.`;
-  else if (d.goal > GOAL_MAX) e['goal'] = `The maximum goal is $${GOAL_MAX.toLocaleString('en-US')}.`;
+  else if (d.goal < GOAL_MIN) e['goal'] = `The minimum goal is ${formatMoney(GOAL_MIN)}, enough for a meaningful test.`;
+  else if (d.goal > GOAL_MAX) e['goal'] = `The maximum goal is ${formatMoney(GOAL_MAX)}.`;
   if (!d.acceptedRules) e['acceptedRules'] = 'Confirm the campaign rules to submit.';
   return e;
 }
@@ -95,8 +95,8 @@ export function firstInvalidStep(d: DraftContent) {
 
 export function validateContributionAmount(amount: number): string | null {
   if (!Number.isFinite(amount)) return 'Enter an amount.';
-  if (amount < REACH_CONFIG.minContribution) return `The minimum contribution is $${REACH_CONFIG.minContribution}.`;
-  if (amount > REACH_CONFIG.maxContribution) return `The maximum contribution is $${REACH_CONFIG.maxContribution.toLocaleString('en-US')}.`;
-  if (Math.abs(Math.round(amount * 100) - amount * 100) > 1e-6) return 'Use whole cents.';
+  if (amount < REACH_CONFIG.minContribution) return `The minimum contribution is ${formatMoney(REACH_CONFIG.minContribution)}.`;
+  if (amount > REACH_CONFIG.maxContribution) return `The maximum contribution is ${formatMoney(REACH_CONFIG.maxContribution)}.`;
+  if (!Number.isInteger(amount)) return 'Use whole rupees.';
   return null;
 }

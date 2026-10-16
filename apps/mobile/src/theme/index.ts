@@ -1,61 +1,71 @@
 import { useColorScheme } from 'react-native';
+import { useAppearance } from '@/lib/appearance';
 
 /**
- * Design tokens. Calm, editorial palette: warm paper, deep ink, one teal
- * accent. Every colour pair used for text meets WCAG AA contrast.
+ * Design tokens. Premium monochrome (black / warm greys) with a single
+ * emerald accent (growth, support, "go"), used sparingly for the main action,
+ * progress and the ripple motif. Supporting colours are quiet: sage for
+ * neutral tags, terracotta for warnings, red for errors. No yellows.
  */
 const light = {
-  bg: '#F7F5F0',
+  bg: '#F4F3F1',
   surface: '#FFFFFF',
-  surfaceAlt: '#EFECE5',
-  text: '#16181B',
-  textMuted: '#5E636B',
-  textSubtle: '#80858D',
-  border: '#E3DFD6',
-  primary: '#0D5C50',
-  primaryPressed: '#094A40',
-  primarySoft: '#DCEDE8',
+  surfaceAlt: '#ECEBE8',
+  text: '#111113',
+  textMuted: '#5F5F66',
+  textSubtle: '#8A8A91',
+  border: '#E2E0DC',
+  primary: '#127A4B',
+  primaryPressed: '#0E6640',
+  primarySoft: '#E2F3EA',
+  /** Loading spinners: a brighter green than text-safe primary so they feel light. */
+  spinner: '#2DAA6E',
   onPrimary: '#FFFFFF',
-  accent: '#B8651B',
-  accentSoft: '#F6E8D9',
-  success: '#1E7A46',
-  successSoft: '#DFF1E6',
-  warning: '#8F5B00',
-  warningSoft: '#FBEFD5',
-  danger: '#B3261E',
-  dangerSoft: '#F9E1DE',
-  info: '#2457A5',
-  infoSoft: '#E1EAF8',
-  track: '#E6E2DA',
-  overlay: 'rgba(16,18,20,0.45)',
-  skeleton: '#E9E5DD',
+  accent: '#4E6A60',
+  accentSoft: '#E8EFEB',
+  success: '#1F7A80',
+  successSoft: '#E0F0F1',
+  warning: '#B4561E',
+  warningSoft: '#FBEADF',
+  danger: '#C0302E',
+  dangerSoft: '#FAE3E2',
+  info: '#3F5F8A',
+  infoSoft: '#E6ECF3',
+  track: '#E2E0DC',
+  overlay: 'rgba(10,10,12,0.5)',
+  skeleton: '#E6E4E0',
+  ink: '#111113',
+  onInk: '#F4F2EE',
 };
 
 const dark: typeof light = {
-  bg: '#0F1112',
-  surface: '#181B1D',
-  surfaceAlt: '#212528',
-  text: '#F1EEE8',
-  textMuted: '#A9AEB4',
-  textSubtle: '#80868D',
-  border: '#2B3034',
-  primary: '#5CC2AE',
-  primaryPressed: '#47A895',
-  primarySoft: '#16332D',
-  onPrimary: '#06221D',
-  accent: '#E39A55',
-  accentSoft: '#3A2918',
-  success: '#62C48A',
-  successSoft: '#163323',
-  warning: '#E8B550',
-  warningSoft: '#3A2D12',
-  danger: '#F08A80',
-  dangerSoft: '#3D1C19',
-  info: '#8DB4F0',
-  infoSoft: '#1A2840',
-  track: '#2B3034',
-  overlay: 'rgba(0,0,0,0.6)',
-  skeleton: '#24282B',
+  bg: '#0B0B0C',
+  surface: '#151517',
+  surfaceAlt: '#1E1E21',
+  text: '#F4F2EE',
+  textMuted: '#A3A3A8',
+  textSubtle: '#76767C',
+  border: '#2A2A2E',
+  primary: '#3FCF8E',
+  primaryPressed: '#2FB57A',
+  primarySoft: '#11241A',
+  spinner: '#3FCF8E',
+  onPrimary: '#04140B',
+  accent: '#9FB8AD',
+  accentSoft: '#18211D',
+  success: '#62C6CC',
+  successSoft: '#122426',
+  warning: '#EE9460',
+  warningSoft: '#2A1A11',
+  danger: '#F07272',
+  dangerSoft: '#2C1414',
+  info: '#93AED6',
+  infoSoft: '#17202C',
+  track: '#2A2A2E',
+  overlay: 'rgba(0,0,0,0.65)',
+  skeleton: '#1F1F22',
+  ink: '#F4F2EE',
+  onInk: '#0B0B0C',
 };
 
 export type Colors = typeof light;
@@ -64,42 +74,45 @@ export type Colors = typeof light;
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32, huge: 48 } as const;
 export const radius = { sm: 8, md: 12, lg: 16, xl: 22, pill: 999 } as const;
 
+/** Bricolage Grotesque for headings (character), Inter for reading and numbers (clarity). */
 export const fonts = {
-  serif: 'Newsreader_600SemiBold',
-  serifRegular: 'Newsreader_400Regular',
-  serifItalic: 'Newsreader_400Regular_Italic',
+  display: 'BricolageGrotesque_700Bold',
+  displayMedium: 'BricolageGrotesque_600SemiBold',
   sans: 'Inter_400Regular',
+  sansItalic: 'Inter_400Regular_Italic',
   sansMedium: 'Inter_500Medium',
   sansSemibold: 'Inter_600SemiBold',
   sansBold: 'Inter_700Bold',
 };
 
 export const type = {
-  display: { fontFamily: fonts.serif, fontSize: 32, lineHeight: 38, letterSpacing: -0.4 },
-  title: { fontFamily: fonts.serif, fontSize: 26, lineHeight: 32, letterSpacing: -0.2 },
-  heading: { fontFamily: fonts.serif, fontSize: 21, lineHeight: 27 },
-  subheading: { fontFamily: fonts.sansSemibold, fontSize: 17, lineHeight: 23 },
+  display: { fontFamily: fonts.display, fontSize: 32, lineHeight: 36, letterSpacing: -0.8 },
+  title: { fontFamily: fonts.display, fontSize: 26, lineHeight: 30, letterSpacing: -0.5 },
+  heading: { fontFamily: fonts.displayMedium, fontSize: 20, lineHeight: 25, letterSpacing: -0.3 },
+  subheading: { fontFamily: fonts.sansSemibold, fontSize: 16, lineHeight: 22, letterSpacing: -0.1 },
   body: { fontFamily: fonts.sans, fontSize: 15, lineHeight: 22 },
   bodyStrong: { fontFamily: fonts.sansSemibold, fontSize: 15, lineHeight: 22 },
-  reading: { fontFamily: fonts.serifRegular, fontSize: 18, lineHeight: 29 },
+  reading: { fontFamily: fonts.sans, fontSize: 17, lineHeight: 27 },
   small: { fontFamily: fonts.sans, fontSize: 13, lineHeight: 18 },
   smallStrong: { fontFamily: fonts.sansSemibold, fontSize: 13, lineHeight: 18 },
-  overline: { fontFamily: fonts.sansSemibold, fontSize: 11, lineHeight: 14, letterSpacing: 0.8, textTransform: 'uppercase' as const },
-  number: { fontFamily: fonts.sansBold, fontSize: 22, lineHeight: 26, fontVariant: ['tabular-nums' as const] },
+  overline: { fontFamily: fonts.sansSemibold, fontSize: 11, lineHeight: 14, letterSpacing: 1, textTransform: 'uppercase' as const },
+  number: { fontFamily: fonts.sansBold, fontSize: 22, lineHeight: 26, letterSpacing: -0.3, fontVariant: ['tabular-nums' as const] },
 };
 
 export type TypeVariant = keyof typeof type;
 
+/** Resolves the saved appearance choice (or the phone setting) to a palette. */
 export function useTheme() {
   const scheme = useColorScheme();
-  const c = scheme === 'dark' ? dark : light;
-  return { c, dark: scheme === 'dark', space, radius, type, fonts };
+  const mode = useAppearance((s) => s.mode);
+  const isDark = mode === 'system' ? scheme === 'dark' : mode === 'dark';
+  return { c: isDark ? dark : light, dark: isDark, space, radius, type, fonts };
 }
 
 export const shadow = {
   card: {
     shadowColor: '#000',
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.08,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,

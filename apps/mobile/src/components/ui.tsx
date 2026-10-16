@@ -1,12 +1,12 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useState, type ComponentProps, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Animated,
   Platform,
   Pressable,
   StyleSheet,
+  Switch,
   Text as RNText,
   View,
   type PressableProps,
@@ -16,10 +16,18 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { STATUS_META, type CampaignStatus } from '@shared';
+import type { IconWeight } from 'phosphor-react-native';
 import { radius, shadow, space, type, useTheme, type Colors, type TypeVariant } from '@/theme';
+import { ICONS, type IconName } from './icons';
+import { RippleRings } from './brand/RippleRings';
 
-export type IconName = ComponentProps<typeof Ionicons>['name'];
-export const Icon = Ionicons;
+export type { IconName };
+
+/** App icon: Phosphor glyphs behind stable names (see components/icons.ts). */
+export function Icon({ name, size = 20, color, style, weight }: { name: IconName; size?: number; color?: string; style?: StyleProp<ViewStyle>; weight?: IconWeight }) {
+  const [Glyph, defaultWeight] = ICONS[name] ?? ICONS['ellipse-outline'];
+  return <Glyph size={size} color={color} weight={weight ?? defaultWeight} style={style} />;
+}
 
 export const haptic = {
   light: () => Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
@@ -53,7 +61,8 @@ export function Button({ label, variant = 'primary', size = 'md', icon, iconRigh
     quiet: { bg: c.surfaceAlt, fg: c.text, border: c.surfaceAlt },
     danger: { bg: c.dangerSoft, fg: c.danger, border: c.dangerSoft },
   }[variant];
-  const h = size === 'lg' ? 54 : size === 'sm' ? 38 : 48;
+  // Kept compact so actions read as professional, not bulky.
+  const h = size === 'lg' ? 48 : size === 'sm' ? 34 : 42;
   const off = disabled || loading;
   return (
     <Pressable
@@ -69,15 +78,15 @@ export function Button({ label, variant = 'primary', size = 'md', icon, iconRigh
       style={({ pressed }) => [
         {
           height: h,
-          paddingHorizontal: size === 'sm' ? space.md : space.xl,
-          borderRadius: radius.md,
+          paddingHorizontal: size === 'sm' ? space.md : space.lg + 2,
+          borderRadius: 10,
           backgroundColor: palette.bg,
           borderWidth: 1,
           borderColor: palette.border,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: space.sm,
+          gap: 6,
           opacity: off ? 0.5 : pressed ? 0.85 : 1,
           transform: [{ scale: pressed ? 0.985 : 1 }],
         },
@@ -89,11 +98,11 @@ export function Button({ label, variant = 'primary', size = 'md', icon, iconRigh
         <ActivityIndicator color={palette.fg} />
       ) : (
         <>
-          {icon && <Icon name={icon} size={size === 'sm' ? 16 : 18} color={palette.fg} />}
-          <T variant={size === 'sm' ? 'smallStrong' : 'bodyStrong'} style={{ color: palette.fg }} numberOfLines={1}>
+          {icon && <Icon name={icon} size={size === 'sm' ? 15 : 17} color={palette.fg} />}
+          <T variant={size === 'sm' ? 'smallStrong' : 'bodyStrong'} style={[{ color: palette.fg }, size !== 'sm' && { fontSize: 14.5 }]} numberOfLines={1}>
             {label}
           </T>
-          {iconRight && <Icon name={iconRight} size={18} color={palette.fg} />}
+          {iconRight && <Icon name={iconRight} size={size === 'sm' ? 15 : 17} color={palette.fg} />}
         </>
       )}
     </Pressable>
@@ -188,12 +197,12 @@ const toneColors = (c: Colors, tone: string) =>
     primary: { bg: c.primarySoft, fg: c.primary },
   })[tone] ?? { bg: c.surfaceAlt, fg: c.textMuted };
 
-export function Pill({ label, tone = 'neutral', icon }: { label: string; tone?: 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'primary'; icon?: IconName }) {
+/** Small text tag. Deliberately icon-free: tags stay quiet so icons keep their meaning elsewhere. */
+export function Pill({ label, tone = 'neutral' }: { label: string; tone?: 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'primary' }) {
   const { c } = useTheme();
   const t = toneColors(c, tone);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: t.bg }}>
-      {icon && <Icon name={icon} size={12} color={t.fg} />}
       <T variant="smallStrong" style={{ color: t.fg, fontSize: 12 }}>
         {label}
       </T>
@@ -230,14 +239,17 @@ export function Skeleton({ h = 16, w = '100%', r = 6, style }: { h?: number; w?:
 export function EmptyState({ icon = 'leaf-outline', title, body, action }: { icon?: IconName; title: string; body?: string; action?: ReactNode }) {
   const { c } = useTheme();
   return (
-    <View style={{ alignItems: 'center', paddingVertical: space.huge, paddingHorizontal: space.xxl, gap: space.md }}>
-      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: c.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name={icon} size={28} color={c.textMuted} />
+    <View style={{ alignItems: 'center', paddingVertical: space.xxxl, paddingHorizontal: space.xl, gap: space.sm }}>
+      <View style={{ width: 96, height: 96, alignItems: 'center', justifyContent: 'center' }}>
+        <RippleRings size={96} color={c.primary} rings={3} style={{ position: 'absolute', opacity: 0.5 }} />
+        <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={icon} size={22} color={c.textMuted} weight="duotone" />
+        </View>
       </View>
       <T variant="subheading" center>
         {title}
       </T>
-      {body && (
+      {!!body && (
         <T color="textMuted" center>
           {body}
         </T>
@@ -262,11 +274,11 @@ export function Banner({ tone = 'info', icon, title, body, action }: { tone?: 'i
   const { c } = useTheme();
   const t = toneColors(c, tone);
   return (
-    <View style={{ flexDirection: 'row', gap: space.md, padding: space.lg, borderRadius: radius.md, backgroundColor: t.bg }}>
-      {icon && <Icon name={icon} size={20} color={t.fg} style={{ marginTop: 1 }} />}
-      <View style={{ flex: 1, gap: 4 }}>
-        {title && (
-          <T variant="bodyStrong" style={{ color: t.fg }}>
+    <View style={{ flexDirection: 'row', gap: space.sm, paddingVertical: space.sm + 2, paddingHorizontal: space.md, borderRadius: radius.sm + 2, backgroundColor: t.bg }}>
+      {!!icon && <Icon name={icon} size={16} color={t.fg} style={{ marginTop: 1 }} />}
+      <View style={{ flex: 1, gap: 2 }}>
+        {!!title && (
+          <T variant="smallStrong" style={{ color: t.fg }}>
             {title}
           </T>
         )}
@@ -284,7 +296,7 @@ export function ListRow({ icon, title, subtitle, onPress, right, danger }: { ico
       accessibilityRole={onPress ? 'button' : undefined}
       onPress={onPress}
       style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 56, paddingVertical: space.md, opacity: pressed ? 0.6 : 1 })}>
-      {icon && (
+      {!!icon && (
         <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: danger ? c.dangerSoft : c.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name={icon} size={18} color={danger ? c.danger : c.text} />
         </View>
@@ -293,7 +305,7 @@ export function ListRow({ icon, title, subtitle, onPress, right, danger }: { ico
         <T variant="bodyStrong" style={danger && { color: c.danger }}>
           {title}
         </T>
-        {subtitle && (
+        {!!subtitle && (
           <T variant="small" color="textMuted">
             {subtitle}
           </T>
@@ -308,14 +320,14 @@ export function SectionTitle({ title, action, onAction, overline }: { title: str
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: space.md }}>
       <View style={{ flex: 1 }}>
-        {overline && (
+        {!!overline && (
           <T variant="overline" color="primary" style={{ marginBottom: 4 }}>
             {overline}
           </T>
         )}
         <T variant="heading">{title}</T>
       </View>
-      {action && (
+      {!!action && (
         <Pressable accessibilityRole="button" onPress={onAction} hitSlop={10}>
           <T variant="smallStrong" color="primary">
             {action}
@@ -333,7 +345,7 @@ export function Stat({ label, value, hint }: { label: string; value: string; hin
       <T variant="small" color="textMuted">
         {label}
       </T>
-      {hint && (
+      {!!hint && (
         <T variant="small" color="textSubtle" style={{ fontSize: 11 }}>
           {hint}
         </T>
@@ -343,7 +355,23 @@ export function Stat({ label, value, hint }: { label: string; value: string; hin
 }
 
 export function DemoBadge() {
-  return <Pill label="Sample data" tone="accent" icon="flask-outline" />;
+  return <Pill label="Sample data" tone="accent" />;
 }
 
 export { shadow };
+
+/** react-native-web's switch uses a teal thumb when on unless told otherwise. */
+const WEB_THUMB = Platform.OS === 'web' ? ({ activeThumbColor: '#FFFFFF' } as object) : {};
+
+/**
+ * On/off switch used everywhere. The fixed-height wrapper keeps it vertically
+ * centred in its row (the iOS switch can otherwise sit at the top of its box).
+ */
+export function Toggle({ value, onValueChange, disabled, accessibilityLabel }: { value: boolean; onValueChange?: (v: boolean) => void; disabled?: boolean; accessibilityLabel: string }) {
+  const { c } = useTheme();
+  return (
+    <View style={{ height: 32, justifyContent: 'center', alignSelf: 'center' }}>
+      <Switch value={value} disabled={disabled} onValueChange={onValueChange} trackColor={{ true: c.primary, false: c.track }} ios_backgroundColor={c.track} thumbColor="#FFFFFF" {...WEB_THUMB} accessibilityLabel={accessibilityLabel} />
+    </View>
+  );
+}

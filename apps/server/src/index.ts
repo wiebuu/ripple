@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { env } from './lib/env';
+import { startScheduler } from './lib/jobs';
 import { optionalAuth } from './lib/auth';
 import { errorHandler } from './lib/http';
 import { auth } from './routes/auth';
@@ -24,7 +25,7 @@ app.use(optionalAuth);
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 /** Public estimate assumptions so the app and server always agree. */
-app.get('/config', (_req, res) => res.json({ reach: REACH_CONFIG, channels: CHANNELS, aiEnabled: !!env.anthropicKey }));
+app.get('/config', (_req, res) => res.json({ reach: REACH_CONFIG, channels: CHANNELS, aiEnabled: !!env.geminiKey, googleSignIn: !!env.firebaseWebApiKey, payments: env.razorpay ? { provider: 'razorpay-test', keyId: env.razorpay.keyId } : { provider: 'none' } }));
 
 app.use('/auth', auth);
 app.use('/campaigns', campaigns);
@@ -38,4 +39,7 @@ app.use('/uploads', uploads);
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 app.use(errorHandler);
 
-app.listen(env.port, '0.0.0.0', () => console.log(`API listening on :${env.port}`));
+app.listen(env.port, '0.0.0.0', () => {
+  console.log(`API listening on :${env.port}`);
+  if (process.env.NODE_ENV !== 'test') startScheduler();
+});

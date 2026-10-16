@@ -3,18 +3,22 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
-// SQLite has no enums; allowed values live in /shared and are enforced by the API.
+// Allowed values for status/role/kind strings live in /shared and are enforced by the API.
 
 model User {
-  id            String         @id @default(cuid())
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
   name          String
-  email         String?        @unique
+  // Not @unique: MongoDB unique indexes reject multiple guests without an email. Uniqueness is enforced in /auth.
+  email         String?
   role          String         @default("USER") // USER | REVIEWER
   isGuest       Boolean        @default(true)
+  // Firebase Authentication user id, set when signing in with Google.
+  firebaseUid   String?
+  avatarUrl     String?
   createdAt     DateTime       @default(now())
   campaigns     Campaign[]
   contributions Contribution[]
@@ -22,12 +26,15 @@ model User {
   follows       Follow[]
   saves         Save[]
   prefs         Json?
+
+  @@index([email])
+  @@index([firebaseUid])
 }
 
 model Campaign {
-  id             String           @id @default(cuid())
+  id             String           @id @default(auto()) @map("_id") @db.ObjectId
   slug           String           @unique
-  ownerId        String
+  ownerId        String           @db.ObjectId
   owner          User             @relation(fields: [ownerId], references: [id])
   status         String           @default("DRAFT")
   // Denormalised from content for listing/search.
@@ -59,6 +66,7 @@ model Campaign {
   follows        Follow[]
   saves          Save[]
   feedback       Feedback[]
+  complaints     Complaint[]
   report         Report?
 
   @@index([status])
@@ -66,34 +74,38 @@ model Campaign {
 }
 
 model Contribution {
-  id             String   @id @default(cuid())
-  campaignId     String
-  campaign       Campaign @relation(fields: [campaignId], references: [id])
-  userId         String?
-  user           User?    @relation(fields: [userId], references: [id])
-  amount         Float
-  platformFee    Float
-  processingFee  Float
-  total          Float
-  estimatedReach Int
-  status         String   @default("PENDING") // PENDING | SUCCEEDED | FAILED | CANCELLED | REFUNDED
-  failureReason  String?
-  showName       Boolean  @default(false)
-  displayName    String?
-  receiptEmail   String?
-  receiptNo      String   @unique
-  cardLast4      String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  campaignId        String   @db.ObjectId
+  campaign          Campaign @relation(fields: [campaignId], references: [id])
+  userId            String?  @db.ObjectId
+  user              User?    @relation(fields: [userId], references: [id])
+  amount            Float
+  platformFee       Float
+  processingFee     Float
+  total             Float
+  estimatedReach    Int
+  status            String   @default("PENDING") // PENDING | SUCCEEDED | FAILED | CANCELLED | REFUNDED
+  failureReason     String?
+  showName          Boolean  @default(false)
+  displayName       String?
+  receiptEmail      String?
+  receiptNo         String   @unique
+  // SIMULATED or RAZORPAY_TEST. Live payment keys are refused by the server.
+  provider          String   @default("SIMULATED")
+  providerOrderId   String?
+  providerPaymentId String?
+  cardLast4         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([campaignId, status])
 }
 
 model ReviewDecision {
-  id         String   @id @default(cuid())
-  campaignId String
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  campaignId String   @db.ObjectId
   campaign   Campaign @relation(fields: [campaignId], references: [id])
-  actorId    String?
+  actorId    String?  @db.ObjectId
   actorName  String?
   action     String
   fromStatus String?
@@ -103,8 +115,8 @@ model ReviewDecision {
 }
 
 model CampaignUpdate {
-  id         String   @id @default(cuid())
-  campaignId String
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  campaignId String   @db.ObjectId
   campaign   Campaign @relation(fields: [campaignId], references: [id])
   title      String
   body       String
@@ -112,52 +124,56 @@ model CampaignUpdate {
 }
 
 model Notification {
-  id         String   @id @default(cuid())
-  userId     String
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
   user       User     @relation(fields: [userId], references: [id])
   kind       String
   title      String
   body       String
-  campaignId String?
+  campaignId String?  @db.ObjectId
   read       Boolean  @default(false)
-  dedupeKey  String?
+  // Always set (random when not deduplicating): MongoDB unique indexes treat null as a value.
+  dedupeKey  String
   createdAt  DateTime @default(now())
 
   @@unique([userId, dedupeKey])
 }
 
 model Follow {
-  userId     String
-  campaignId String
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
+  campaignId String   @db.ObjectId
   user       User     @relation(fields: [userId], references: [id])
   campaign   Campaign @relation(fields: [campaignId], references: [id])
   createdAt  DateTime @default(now())
 
-  @@id([userId, campaignId])
+  @@unique([userId, campaignId])
 }
 
 model Save {
-  userId     String
-  campaignId String
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
+  campaignId String   @db.ObjectId
   user       User     @relation(fields: [userId], references: [id])
   campaign   Campaign @relation(fields: [campaignId], references: [id])
   createdAt  DateTime @default(now())
 
-  @@id([userId, campaignId])
+  @@unique([userId, campaignId])
 }
 
 model Feedback {
-  id         String   @id @default(cuid())
-  campaignId String
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  campaignId String   @db.ObjectId
   campaign   Campaign @relation(fields: [campaignId], references: [id])
-  userId     String?
+  userId     String?  @db.ObjectId
   question   String // VISUALS | MIND_CHANGED
   answer     String // NO | SOMEWHAT | YES
   createdAt  DateTime @default(now())
 }
 
 model Report {
-  campaignId    String    @id
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  campaignId    String    @unique @db.ObjectId
   campaign      Campaign  @relation(fields: [campaignId], references: [id])
   adSpend       Float     @default(0)
   impressions   Int?
@@ -168,4 +184,22 @@ model Report {
   endedAt       DateTime?
   final         Boolean   @default(false)
   updatedAt     DateTime  @updatedAt
+}
+
+/// Audience reports about a campaign, handled by reviewers.
+model Complaint {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  campaignId String    @db.ObjectId
+  campaign   Campaign  @relation(fields: [campaignId], references: [id])
+  userId     String?   @db.ObjectId
+  reason     String
+  details    String?
+  status     String    @default("OPEN") // OPEN | RESOLVED | DISMISSED
+  resolution String?
+  resolvedBy String?
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([status])
+  @@index([campaignId])
 }

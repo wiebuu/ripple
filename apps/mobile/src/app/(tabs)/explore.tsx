@@ -1,13 +1,15 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Animated, RefreshControl, ScrollView, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, FlatList, Pressable, RefreshControl, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CATEGORIES, CREATOR_TYPES } from '@shared';
-import { CampaignCard, CardSkeleton } from '@/components/campaign';
+import { PostCard, PostDivider, PostSkeleton, SpotlightCard } from '@/components/campaign';
 import { Sheet } from '@/components/Sheet';
+import { TabHeader } from '@/components/TabHeader';
 import { Button, Chip, EmptyState, ErrorState, Icon, IconButton, T, haptic } from '@/components/ui';
 import { useCollapsingHeader } from '@/hooks/useCollapsingHeader';
-import { useInfiniteCampaigns, type ListParams } from '@/lib/queries';
+import { useTabReselect } from '@/hooks/useTabReselect';
+import { useCampaigns, useInfiniteCampaigns, type ListParams } from '@/lib/queries';
 import { fonts, radius, space, useTheme } from '@/theme';
 
 const SORTS: { key: NonNullable<ListParams['sort']>; label: string }[] = [
@@ -36,7 +38,8 @@ function useDebounced<T>(v: T, ms = 300) {
 export default function Explore() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ category?: string }>();
+  const params = useLocalSearchParams<{ category?: string; focus?: string }>();
+  const searchRef = useRef<TextInput>(null);
   const [q, setQ] = useState('');
   const [category, setCategory] = useState<string | undefined>(params.category);
   const [sort, setSort] = useState<NonNullable<ListParams['sort']>>('trending');
@@ -54,7 +57,9 @@ export default function Explore() {
   }
 
   const query = useInfiniteCampaigns({ q: dq || undefined, category, sort, status, creatorType, minPct });
-  const header = useCollapsingHeader();
+  const featured = useCampaigns({ featured: true, status: 'all', sort: 'trending' });
+  const { width } = useWindowDimensions();
+  const cardW = Math.min(width - 72, 320);
   const filterCount = [status !== 'all', !!creatorType, !!minPct].filter(Boolean).length;
   const anyFilter = !!dq || !!category || filterCount > 0;
   const clear = () => {
@@ -69,78 +74,151 @@ export default function Explore() {
   const refresh = async () => {
     haptic.light();
     setRefreshing(true);
-    await query.refetch();
+    await Promise.all([query.refetch(), featured.refetch()]);
     setRefreshing(false);
   };
+  const list = useRef<FlatList>(null);
+  const header = useCollapsingHeader();
+  const padTop = insets.top + header.height;
+  useTabReselect(() => {
+    list.current?.scrollToOffset({ offset: 0, animated: true });
+    refresh();
+  });
+  // "Search" elsewhere opens Explore with the search field focused (each tap sends a fresh `focus` value).
+  useEffect(() => {
+    if (!params.focus) return;
+    list.current?.scrollToOffset({ offset: 0, animated: false });
+    const t = setTimeout(() => searchRef.current?.focus(), 300);
+    return () => clearTimeout(t);
+  }, [params.focus]);
+
+  const results = query.isPending
+    ? 'Searching…'
+    : query.isSuccess
+      ? query.items.length < query.total
+        ? `Showing ${query.items.length} of ${query.total}`
+        : `${query.total} campaign${query.total === 1 ? '' : 's'}`
+      : '';
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: c.bg, zIndex: 20 }} />
       <Animated.View onLayout={header.onLayout} style={[header.headerStyle, { top: insets.top, backgroundColor: c.bg }]}>
-        <View style={{ paddingHorizontal: space.xl, paddingTop: space.md, gap: space.md }}>
-          <T variant="title" accessibilityRole="header">
-            Explore
-          </T>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, height: 48, paddingHorizontal: space.md, borderRadius: radius.md, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border }}>
-            <Icon name="search" size={18} color={c.textMuted} />
+        <TabHeader title="Explore">
+          <View>
+            <IconButton icon="options-outline" label={filterCount ? `Filters, ${filterCount} on` : 'Filters'} onPress={() => setSheet(true)} />
+            {filterCount > 0 && (
+              <View pointerEvents="none" style={{ position: 'absolute', top: 4, right: 4, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 4, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }}>
+                <T variant="small" style={{ fontSize: 10, lineHeight: 12, color: c.onPrimary, fontWeight: '700' }}>
+                  {filterCount}
+                </T>
+              </View>
+            )}
+          </View>
+        </TabHeader>
+        <View style={{ paddingHorizontal: space.xl }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, height: 44, paddingHorizontal: space.lg, borderRadius: radius.pill, backgroundColor: c.surfaceAlt }}>
+            <Icon name="search" size={17} color={c.textMuted} />
             <TextInput
+              ref={searchRef}
               value={q}
               onChangeText={setQ}
-              placeholder="Search campaigns, creators, topics"
+              placeholder="Search causes, creators, places"
               placeholderTextColor={c.textSubtle}
               returnKeyType="search"
               accessibilityLabel="Search campaigns"
-              style={{ flex: 1, fontFamily: fonts.sans, fontSize: 16, color: c.text }}
+              style={{ flex: 1, fontFamily: fonts.sans, fontSize: 15, color: c.text }}
             />
-            {!!q && <IconButton icon="close-circle" label="Clear search" size={18} onPress={() => setQ('')} />}
+            {!!q && <IconButton icon="close-circle" label="Clear search" size={17} onPress={() => setQ('')} style={{ marginRight: -space.sm }} />}
           </View>
         </View>
-        <View style={{ height: 60 }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.xl, alignItems: 'center', gap: space.sm }}>
-            <Chip label="All" selected={!category} onPress={() => setCategory(undefined)} />
-            {CATEGORIES.map((cat) => (
-              <Chip key={cat} label={cat} selected={category === cat} onPress={() => setCategory(category === cat ? undefined : cat)} />
-            ))}
-          </ScrollView>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.xl, paddingBottom: space.sm, gap: space.sm }}>
-          <T variant="small" color="textMuted" style={{ flex: 1 }} accessibilityLiveRegion="polite">
-            {query.isPending ? 'Searching…' : query.isSuccess ? `${query.total} campaign${query.total === 1 ? '' : 's'} · ${sortLabel}` : ''}
-          </T>
-          <Button label={filterCount ? `Sort & filter · ${filterCount}` : 'Sort & filter'} icon="options-outline" size="sm" variant="secondary" onPress={() => setSheet(true)} />
-        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.xl, paddingTop: space.md, paddingBottom: space.sm, gap: 6 }}>
+          <CategoryPill label="All" selected={!category} onPress={() => setCategory(undefined)} />
+          {CATEGORIES.map((cat) => (
+            <CategoryPill key={cat} label={cat} selected={category === cat} onPress={() => setCategory(category === cat ? undefined : cat)} />
+          ))}
+        </ScrollView>
       </Animated.View>
 
       <Animated.FlatList
+        ref={list}
         data={query.items}
         keyExtractor={(i) => i.id}
+        ItemSeparatorComponent={PostDivider}
         onScroll={header.onScroll}
         scrollEventThrottle={16}
-        contentContainerStyle={{ padding: space.xl, paddingTop: insets.top + header.height + space.sm, gap: space.lg, paddingBottom: space.huge }}
+        contentContainerStyle={{ paddingTop: padTop + space.xs, paddingBottom: space.huge }}
         keyboardDismissMode="on-drag"
         onEndReached={query.loadMore}
         onEndReachedThreshold={0.6}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={c.primary} progressViewOffset={insets.top + header.height} />}
-        renderItem={({ item }) => <CampaignCard c={item} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={c.spinner} colors={[c.spinner]} progressViewOffset={padTop} />}
+        renderItem={({ item }) => <PostCard c={item} />}
+        ListHeaderComponent={
+          <View style={{ gap: space.lg }}>
+            {!anyFilter && (featured.data?.items.length ?? 0) > 0 && (
+              <View style={{ gap: space.md }}>
+                <T variant="heading" style={{ paddingHorizontal: space.xl }}>
+                  Gaining momentum
+                </T>
+                <FlatList
+                  horizontal
+                  data={featured.data!.items}
+                  keyExtractor={(x) => `f-${x.id}`}
+                  showsHorizontalScrollIndicator={false}
+                  snapToInterval={cardW + space.md}
+                  decelerationRate="fast"
+                  contentContainerStyle={{ paddingHorizontal: space.xl, gap: space.md }}
+                  renderItem={({ item }) => <SpotlightCard c={item} width={cardW} />}
+                />
+              </View>
+            )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.xl }}>
+              <View style={{ flex: 1 }}>
+                <T variant="heading">{anyFilter ? (category && !dq ? category : 'Results') : 'All campaigns'}</T>
+                <T variant="small" color="textMuted" accessibilityLiveRegion="polite">
+                  {results}
+                </T>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Sorted by ${sortLabel}. Change sort and filters`}
+                onPress={() => setSheet(true)}
+                hitSlop={6}
+                style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, height: 32, paddingHorizontal: 12, borderRadius: radius.pill, borderWidth: 1, borderColor: c.border, opacity: pressed ? 0.7 : 1 })}>
+                <T variant="smallStrong">{sortLabel}</T>
+                <Icon name="chevron-down" size={13} color={c.textMuted} />
+              </Pressable>
+            </View>
+          </View>
+        }
         ListFooterComponent={
           query.isFetchingNextPage ? (
-            <ActivityIndicator color={c.primary} style={{ paddingVertical: space.lg }} accessibilityLabel="Loading more campaigns" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, paddingVertical: space.xl }} accessibilityLiveRegion="polite">
+              <ActivityIndicator color={c.spinner} />
+              <T variant="small" color="textMuted">
+                Loading more campaigns…
+              </T>
+            </View>
           ) : query.isFetchNextPageError ? (
-            <Button label="Couldn’t load more. Try again" variant="secondary" icon="refresh" onPress={() => query.fetchNextPage()} />
+            <View style={{ paddingTop: space.lg, paddingHorizontal: space.xl }}>
+              <Button label="Couldn’t load more. Try again" variant="secondary" icon="refresh" onPress={() => query.fetchNextPage()} />
+            </View>
           ) : !query.hasNextPage && query.items.length > 3 ? (
-            <T variant="small" color="textSubtle" center>
+            <T variant="small" color="textSubtle" center style={{ paddingTop: space.xl }}>
               That’s everything for this search.
             </T>
           ) : null
         }
         ListEmptyComponent={
           query.isPending ? (
-            <View style={{ gap: space.lg }}>
-              <CardSkeleton />
-              <CardSkeleton />
+            <View>
+              <PostSkeleton />
+              <PostSkeleton />
             </View>
           ) : query.isError ? (
-            <ErrorState message={(query.error as Error).message} onRetry={() => query.refetch()} />
+            <View style={{ paddingHorizontal: space.xl }}>
+              <ErrorState message={(query.error as Error).message} onRetry={() => query.refetch()} />
+            </View>
           ) : anyFilter ? (
             <EmptyState
               icon="search-outline"
@@ -175,6 +253,25 @@ export default function Explore() {
         </Group>
       </Sheet>
     </View>
+  );
+}
+
+/** Compact category filter: green when selected, quiet outline otherwise. */
+function CategoryPill({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  const { c } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={() => {
+        haptic.light();
+        onPress();
+      }}
+      style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: selected ? c.primary : 'transparent', borderWidth: 1, borderColor: selected ? c.primary : c.border, opacity: pressed ? 0.75 : 1 })}>
+      <T variant="smallStrong" style={{ color: selected ? c.onPrimary : c.textMuted }}>
+        {label}
+      </T>
+    </Pressable>
   );
 }
 

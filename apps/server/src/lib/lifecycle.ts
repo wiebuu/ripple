@@ -139,7 +139,7 @@ export async function simulateDelivery(campaignId: string, progress = 0.25) {
   const total = Object.values(split).reduce((a, b) => a + (b ?? 0), 0) || 1;
   const byChannel = CHANNELS.filter((ch) => split[ch.key]).map((ch) => {
     const s = (spend * (split[ch.key] ?? 0)) / total;
-    const cpm = 12 / ch.factor; // cheaper placements => more impressions
+    const cpm = 1000 / ch.factor; // ₹ per 1,000 impressions; cheaper placements => more impressions
     const impressions = Math.round((s / cpm) * 1000);
     return { channel: ch.key as ChannelKey, spend: Math.round(s * 100) / 100, impressions, clicks: Math.round(impressions * 0.012) };
   });

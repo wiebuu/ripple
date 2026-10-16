@@ -19,8 +19,8 @@ export function Accordion({ title, icon, summary, children, initiallyOpen = fals
           LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           setOpen(!open);
         }}
-        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.lg, opacity: pressed ? 0.7 : 1 })}>
-        {icon && <Icon name={icon} size={20} color={c.primary} />}
+        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md + 2, opacity: pressed ? 0.7 : 1 })}>
+        {icon && <Icon name={icon} size={18} color={c.primary} />}
         <View style={{ flex: 1 }}>
           <T variant="bodyStrong">{title}</T>
           {summary && !open && (
@@ -31,7 +31,7 @@ export function Accordion({ title, icon, summary, children, initiallyOpen = fals
         </View>
         <Icon name={open ? 'chevron-up' : 'chevron-down'} size={18} color={c.textMuted} />
       </Pressable>
-      {open && <View style={{ paddingBottom: space.lg, gap: space.md }}>{children}</View>}
+      {open && <View style={{ paddingBottom: space.md, gap: space.sm + 2 }}>{children}</View>}
       {!last && <Divider />}
     </View>
   );

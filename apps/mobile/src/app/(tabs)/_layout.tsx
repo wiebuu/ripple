@@ -50,7 +50,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="create" options={{ title: 'Create', tabBarButton: (props) => <CreateButton onPress={props.onPress} accessibilityState={props.accessibilityState} /> }} />
       <Tabs.Screen
         name="activity"
-        options={{ ...tab('Activity', 'notifications-outline', 'notifications'), tabBarBadge: unread ? (unread > 9 ? '9+' : unread) : undefined, tabBarBadgeStyle: { backgroundColor: c.accent, fontSize: 10 } }}
+        options={{ ...tab('Activity', 'notifications-outline', 'notifications'), tabBarBadge: unread ? (unread > 9 ? '9+' : unread) : undefined, tabBarBadgeStyle: { backgroundColor: c.primary, color: c.onPrimary, fontSize: 10, fontWeight: '700', minWidth: 18, height: 18, lineHeight: 18, borderRadius: 9 } }}
       />
       <Tabs.Screen name="profile" options={tab('Profile', 'person-circle-outline', 'person-circle')} />
     </Tabs>

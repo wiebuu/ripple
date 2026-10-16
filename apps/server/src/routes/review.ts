@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { CAMPAIGN_STATUSES, validateAll, type DraftContent } from '../../../../shared';
 import { requireRole } from '../lib/auth';
@@ -17,9 +16,10 @@ review.get(
   '/queue',
   ah(async (_req, res) => {
     const rows = await db.campaign.findMany({ where: { status: { not: 'DRAFT' } }, orderBy: { updatedAt: 'desc' } });
-    const revisions = await db.campaign.findMany({ where: { pendingContent: { not: Prisma.AnyNull } }, select: { id: true } });
-    const rev = new Set(revisions.map((r) => r.id));
-    res.json({ items: rows.map((c) => ({ ...toSummary(c), hasPendingRevision: rev.has(c.id), budgetApproved: c.budgetApproved, adSetupReady: c.adSetupReady })) });
+    const rev = new Set(rows.filter((r) => r.pendingContent != null).map((r) => r.id));
+    const open = await db.complaint.groupBy({ by: ['campaignId'], where: { status: 'OPEN' }, _count: { _all: true } });
+    const reports = new Map(open.map((o) => [o.campaignId, o._count._all]));
+    res.json({ items: rows.map((c) => ({ ...toSummary(c), hasPendingRevision: rev.has(c.id), openReports: reports.get(c.id) ?? 0, budgetApproved: c.budgetApproved, adSetupReady: c.adSetupReady })) });
   }),
 );
 
@@ -28,7 +28,7 @@ review.get(
   ah(async (req, res) => {
     const c = await db.campaign.findUnique({
       where: { id: req.params.id },
-      include: { decisions: { orderBy: { createdAt: 'desc' } }, report: true, feedback: true },
+      include: { decisions: { orderBy: { createdAt: 'desc' } }, report: true, feedback: true, complaints: { orderBy: { createdAt: 'desc' } } },
     });
     if (!c) throw notFound('Campaign');
     const content = contentOf(c);
@@ -44,6 +44,7 @@ review.get(
       audit: c.decisions,
       report: toReport(c, c.report),
       feedback: { visuals: tally('VISUALS'), mindChanged: tally('MIND_CHANGED') },
+      complaints: c.complaints.map((k) => ({ id: k.id, campaignId: c.id, campaignTitle: c.title, reason: k.reason, details: k.details, status: k.status, resolution: k.resolution, createdAt: k.createdAt.toISOString() })),
     });
   }),
 );
@@ -68,6 +69,24 @@ review.post(
     const to = action === 'reject' ? 'REJECTED' : 'CHANGES_REQUESTED';
     const c = await transition(req.params.id, to, actor, { action: to, note });
     res.json(toSummary(c));
+  }),
+);
+
+/** Close a report. Every decision is written to the campaign's audit history. */
+review.post(
+  '/complaints/:cid',
+  ah(async (req, res) => {
+    const { action, note } = z.object({ action: z.enum(['resolve', 'dismiss']), note: z.string().trim().min(3).max(1000) }).parse(req.body);
+    const k = await db.complaint.findUnique({ where: { id: req.params.cid }, include: { campaign: true } });
+    if (!k) throw notFound('Report');
+    if (k.status !== 'OPEN') throw new HttpError(409, 'This report is already closed');
+    const status = action === 'resolve' ? 'RESOLVED' : 'DISMISSED';
+    await db.complaint.update({ where: { id: k.id }, data: { status, resolution: note, resolvedBy: req.user!.name, resolvedAt: new Date() } });
+    await db.reviewDecision.create({
+      data: { campaignId: k.campaignId, actorId: req.user!.id, actorName: req.user!.name, action: 'MODERATION', fromStatus: k.campaign.status, toStatus: k.campaign.status, note: `Report (${k.reason.toLowerCase()}) ${status.toLowerCase()}: ${note}` },
+    });
+    if (k.userId) await notify(k.userId, { kind: 'REVIEW', title: 'Your report was reviewed', body: `Thanks for flagging “${k.campaign.title}”. ${action === 'resolve' ? 'We took action.' : 'We reviewed it and found no policy issue.'}`, campaignId: k.campaignId, dedupeKey: `complaint-done:${k.id}` });
+    res.json({ ok: true, status });
   }),
 );
 
@@ -118,7 +137,7 @@ review.post(
     pending.goal = c.goal;
     await db.campaign.update({
       where: { id: c.id },
-      data: approve ? { content: pending as any, pendingContent: Prisma.DbNull, ...columnsFromContent(pending) } : { pendingContent: Prisma.DbNull },
+      data: approve ? { content: pending as any, pendingContent: null, ...columnsFromContent(pending) } : { pendingContent: null },
     });
     await db.reviewDecision.create({
       data: { campaignId: c.id, actorId: req.user!.id, actorName: req.user!.name, action: 'EDIT', fromStatus: c.status, toStatus: c.status, note: note ?? (approve ? 'Revision approved and published' : 'Revision declined') },

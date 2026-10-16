@@ -10,7 +10,7 @@ export async function notify(userId: string, n: Input) {
   if (n.kind !== 'SECURITY' && prefs[n.kind] === false) return;
   try {
     await db.notification.create({
-      data: { userId, kind: n.kind, title: n.title, body: n.body, campaignId: n.campaignId ?? null, dedupeKey: n.dedupeKey ?? null },
+      data: { userId, kind: n.kind, title: n.title, body: n.body, campaignId: n.campaignId ?? null, dedupeKey: n.dedupeKey ?? `once:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}` },
     });
   } catch (e: any) {
     if (e?.code !== 'P2002') throw e; // duplicate dedupeKey: already notified

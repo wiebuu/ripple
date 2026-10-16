@@ -18,12 +18,12 @@ export function Header({ title, onBack, right, subtitle, back = true }: { title?
           <View style={{ width: space.md }} />
         )}
         <View style={{ flex: 1, alignItems: back ? 'center' : 'flex-start' }}>
-          {title && (
+          {!!title && (
             <T variant="subheading" numberOfLines={1} accessibilityRole="header">
               {title}
             </T>
           )}
-          {subtitle && (
+          {!!subtitle && (
             <T variant="small" color="textMuted" numberOfLines={1}>
               {subtitle}
             </T>

@@ -19,8 +19,8 @@ export function RichText({ text, variant = 'reading' }: { text: string; variant?
   while ((m = re.exec(text))) {
     if (m.index > last) parts.push(text.slice(last, m.index));
     const tok = m[0];
-    if (tok.startsWith('**')) parts.push(<T key={i++} variant={variant} style={{ fontFamily: variant === 'reading' ? fonts.serif : fonts.sansSemibold }}>{tok.slice(2, -2)}</T>);
-    else if (tok.startsWith('_')) parts.push(<T key={i++} variant={variant} style={{ fontFamily: variant === 'reading' ? fonts.serifItalic : fonts.sans, fontStyle: 'italic' }}>{tok.slice(1, -1)}</T>);
+    if (tok.startsWith('**')) parts.push(<T key={i++} variant={variant} style={{ fontFamily: fonts.sansBold }}>{tok.slice(2, -2)}</T>);
+    else if (tok.startsWith('_')) parts.push(<T key={i++} variant={variant} style={{ fontFamily: fonts.sansItalic }}>{tok.slice(1, -1)}</T>);
     else {
       const [, label, url] = tok.match(/\[([^\]]+)\]\(([^)]+)\)/)!;
       parts.push(
@@ -89,10 +89,10 @@ export function Block({ b, sources }: { b: StoryBlock; sources: Source[] }) {
       return (
         <View style={{ paddingVertical: space.sm, gap: 6 }}>
           <Icon name="chatbox-ellipses-outline" size={20} color={c.textSubtle} />
-          <T variant="reading" style={{ fontStyle: 'italic', fontSize: 20, lineHeight: 30 }}>
+          <T variant="heading" style={{ fontSize: 21, lineHeight: 29 }}>
             “{b.text}”
           </T>
-          {b.attribution && (
+          {!!b.attribution && (
             <T variant="small" color="textMuted">
               — {b.attribution}
             </T>

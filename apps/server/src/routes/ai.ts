@@ -1,5 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
+import { GoogleGenAI } from '@google/genai';
 import { Router } from 'express';
 import { z } from 'zod';
 import { CATEGORIES, TITLE_MAX } from '../../../../shared';
@@ -53,34 +52,32 @@ Rules:
 - locations and interests: only what the creator mentioned or clearly implied; otherwise empty.
 - Do not suggest a funding goal.`;
 
-let client: Anthropic | null = null;
+let client: GoogleGenAI | null = null;
+const responseSchema = z.toJSONSchema(Suggestion);
+
+/** Asks Gemini for structured suggestions. Returns null if the model is unavailable or replies with an invalid shape. */
+async function geminiSuggest(input: z.infer<typeof Input>): Promise<Suggestion | null> {
+  if (!env.geminiKey) return null;
+  client ??= new GoogleGenAI({ apiKey: env.geminiKey });
+  const a = input.answers;
+  const response = await client.models.generateContent({
+    model: env.aiModel,
+    contents: `Creator: ${input.creatorName || 'not given'}\nWhat the campaign is about: ${a.about}\nWho it should reach: ${a.audience}\nWhy it matters: ${a.why}\nEvidence they have: ${a.evidence}`,
+    config: { systemInstruction: SYSTEM, responseMimeType: 'application/json', responseJsonSchema: responseSchema, temperature: 0.4 },
+  });
+  const parsed = Suggestion.safeParse(JSON.parse(response.text ?? 'null'));
+  return parsed.success ? clamp(parsed.data) : null;
+}
 
 ai.post(
   '/draft',
   ah(async (req, res) => {
     const input = Input.parse(req.body);
-    if (env.anthropicKey) {
-      try {
-        client ??= new Anthropic({ apiKey: env.anthropicKey });
-        const a = input.answers;
-        const response = await client.messages.parse({
-          model: env.aiModel,
-          max_tokens: 4000,
-          output_config: { effort: 'low', format: zodOutputFormat(Suggestion) },
-          system: SYSTEM,
-          messages: [
-            {
-              role: 'user',
-              content: `Creator: ${input.creatorName || 'not given'}\nWhat the campaign is about: ${a.about}\nWho it should reach: ${a.audience}\nWhy it matters: ${a.why}\nEvidence they have: ${a.evidence}`,
-            },
-          ],
-        });
-        if (response.stop_reason !== 'refusal' && response.parsed_output) {
-          return res.json({ demo: false, suggestion: clamp(response.parsed_output) });
-        }
-      } catch (e) {
-        console.warn('AI draft failed, using demo generator:', (e as Error).message);
-      }
+    try {
+      const suggestion = await geminiSuggest(input);
+      if (suggestion) return res.json({ demo: false, suggestion });
+    } catch (e) {
+      console.warn('AI draft failed, using demo generator:', (e as Error).message.slice(0, 200));
     }
     res.json({ demo: true, suggestion: demoSuggestion(input) });
   }),

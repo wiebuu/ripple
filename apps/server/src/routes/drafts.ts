@@ -148,6 +148,28 @@ drafts.post(
   }),
 );
 
+/**
+ * Creator cancels a campaign (or withdraws it from review). If anything was
+ * raised, every successful contribution is refunded before it closes.
+ */
+drafts.post(
+  '/:id/cancel',
+  ah(async (req, res) => {
+    const { reason } = z.object({ reason: z.string().trim().max(500).optional() }).parse(req.body ?? {});
+    const c = await ownCampaign(req.user!.id, req.params.id);
+    if (!['DRAFT', 'SUBMITTED', 'CHANGES_REQUESTED', 'APPROVED', 'FUNDING'].includes(c.status)) {
+      throw new HttpError(409, 'Campaigns can’t be cancelled once funding has closed. Contact support.');
+    }
+    await transition(c.id, 'CANCELLED', req.user!, { action: 'TRANSITION', note: reason ? `Cancelled by creator: ${reason}` : 'Cancelled by creator' });
+    if (c.raised > 0) {
+      await transition(c.id, 'REFUND_PENDING', null, { note: 'Refunding backers' });
+      await db.contribution.updateMany({ where: { campaignId: c.id, status: 'SUCCEEDED' }, data: { status: 'REFUNDED' } });
+      await transition(c.id, 'CANCELLED', null, { note: 'All contributions refunded (simulated)' });
+    }
+    res.json({ ok: true });
+  }),
+);
+
 /** Submit a pending revision of a live campaign for re-review. */
 drafts.post(
   '/:id/submit-revision',

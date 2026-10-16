@@ -1,14 +1,16 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
-import { CATEGORIES, CREATOR_TYPES, PUBLIC_STATUSES, type CampaignDetail } from '../../../../shared';
+import { CATEGORIES, COMPLAINT_REASONS, CREATOR_TYPES, PUBLIC_STATUSES, STATUS_META, type BackerActivity, type CampaignDetail } from '../../../../shared';
 import { requireAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import { ah, forbidden, HttpError, notFound } from '../lib/http';
-import { audienceOf, notifyMany } from '../lib/notify';
+import { audienceOf, notify, notifyMany } from '../lib/notify';
 import { contentOf, toReport, toSummary } from '../lib/serialize';
 
 export const campaigns = Router();
+
+const isObjectId = (s: string) => /^[a-f0-9]{24}$/i.test(s);
 
 const listQuery = z.object({
   q: z.string().trim().max(100).optional(),
@@ -39,7 +41,7 @@ campaigns.get(
       ...(q.creatorType && { creatorType: q.creatorType }),
       ...(q.featured && { featured: true }),
       ...(q.q && {
-        OR: [{ title: { contains: q.q } }, { summary: { contains: q.q } }, { creatorName: { contains: q.q } }, { category: { contains: q.q } }],
+        OR: (['title', 'summary', 'creatorName', 'category'] as const).map((f) => ({ [f]: { contains: q.q, mode: 'insensitive' as const } })),
       }),
     };
     let rows = await db.campaign.findMany({ where });
@@ -59,7 +61,10 @@ campaigns.get(
     // Offset pagination: the app requests one page at a time as the user scrolls.
     const page = rows.slice(q.offset, q.offset + q.limit);
     const nextOffset = q.offset + page.length < rows.length ? q.offset + page.length : null;
-    res.json({ items: page.map(toSummary), total: rows.length, nextOffset });
+    const followed = req.user
+      ? new Set((await db.follow.findMany({ where: { userId: req.user.id, campaignId: { in: page.map((c) => c.id) } }, select: { campaignId: true } })).map((f) => f.campaignId))
+      : null;
+    res.json({ items: page.map((c) => ({ ...toSummary(c), ...(followed && { isFollowing: followed.has(c.id) }) })), total: rows.length, nextOffset });
   }),
 );
 
@@ -72,7 +77,8 @@ campaigns.get(
   '/:id',
   ah(async (req, res) => {
     const c = await db.campaign.findFirst({
-      where: { OR: [{ id: req.params.id }, { slug: req.params.id }] },
+      // Links may use the id or the human-readable slug.
+      where: isObjectId(req.params.id) ? { OR: [{ id: req.params.id }, { slug: req.params.id }] } : { slug: req.params.id },
       include: {
         updates: { orderBy: { createdAt: 'desc' } },
         decisions: { orderBy: { createdAt: 'asc' } },
@@ -120,7 +126,46 @@ campaigns.get(
           : [],
       report: toReport(c, c.report),
     };
-    res.json({ ...detail, hasPendingRevision: !!c.pendingContent });
+    res.json({ ...detail, hasPendingRevision: !!c.pendingContent, ...(isOwner && { backerActivity: await backerActivity(c.id) }) });
+  }),
+);
+
+/** Creator analytics: recent contributions (names only if the backer opted in) and 14-day totals. */
+async function backerActivity(campaignId: string): Promise<BackerActivity> {
+  const since = new Date(Date.now() - 14 * 864e5);
+  const rows = await db.contribution.findMany({ where: { campaignId, status: 'SUCCEEDED' }, orderBy: { createdAt: 'desc' }, take: 200 });
+  const daily = new Map<string, { amount: number; count: number }>();
+  for (let i = 13; i >= 0; i--) daily.set(new Date(Date.now() - i * 864e5).toISOString().slice(0, 10), { amount: 0, count: 0 });
+  for (const k of rows) {
+    if (k.createdAt < since) continue;
+    const d = daily.get(k.createdAt.toISOString().slice(0, 10));
+    if (d) {
+      d.amount += k.amount;
+      d.count += 1;
+    }
+  }
+  return {
+    recent: rows.slice(0, 8).map((k) => ({ amount: k.amount, name: k.showName && k.displayName ? k.displayName : 'Private backer', at: k.createdAt.toISOString() })),
+    daily: [...daily.entries()].map(([day, v]) => ({ day, ...v })),
+  };
+}
+
+/** Anyone (including guests) can report a campaign; reviewers handle it. */
+campaigns.post(
+  '/:id/complaints',
+  ah(async (req, res) => {
+    const reasons = COMPLAINT_REASONS.map((r) => r.key) as [string, ...string[]];
+    const body = z.object({ reason: z.enum(reasons), details: z.string().trim().max(1000).optional() }).parse(req.body);
+    const c = await db.campaign.findUnique({ where: { id: req.params.id } });
+    if (!c || !PUBLIC_STATUSES.includes(c.status as any)) throw notFound('Campaign');
+    if (req.user) {
+      const dup = await db.complaint.findFirst({ where: { campaignId: c.id, userId: req.user.id, status: 'OPEN' } });
+      if (dup) throw new HttpError(409, 'You already reported this campaign. Our review team is looking at it.');
+    }
+    const k = await db.complaint.create({ data: { campaignId: c.id, userId: req.user?.id ?? null, reason: body.reason, details: body.details || null } });
+    const reviewers = await db.user.findMany({ where: { role: 'REVIEWER' }, select: { id: true } });
+    await notifyMany(reviewers.map((r) => r.id), { kind: 'REVIEW', title: 'New report', body: `“${c.title}” was reported: ${COMPLAINT_REASONS.find((r) => r.key === body.reason)?.label}.`, campaignId: c.id, dedupeKey: `complaint:${k.id}` });
+    res.status(201).json({ ok: true });
   }),
 );
 
@@ -137,6 +182,19 @@ campaigns.post(
   ah(async (req, res) => {
     const { on } = z.object({ on: z.boolean() }).parse(req.body);
     await toggle('follow', req.user!.id, req.params.id, on);
+    if (on) {
+      const c = await db.campaign.findUnique({ where: { id: req.params.id } });
+      if (c && c.ownerId !== req.user!.id) {
+        const pct = c.goal ? Math.round((c.raised / c.goal) * 100) : 0;
+        await notify(req.user!.id, {
+          kind: 'FUNDING',
+          title: `Following “${c.title}”`,
+          body: `${STATUS_META[c.status as keyof typeof STATUS_META]?.label ?? 'Live'} · ${pct}% funded. You’ll hear about milestones, when ads launch, delivery updates and the final report.`,
+          campaignId: c.id,
+          dedupeKey: `follow:${c.id}`,
+        });
+      }
+    }
     res.json({ ok: true, on });
   }),
 );

@@ -1,30 +1,23 @@
 import { Image } from 'expo-image';
-import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Animated, Pressable, Share, View } from 'react-native';
+import { Animated, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CHANNELS, REACH_CONFIG, STATUS_META, feeBreakdown, type CampaignSummary } from '@shared';
+import { BACKABLE_STATUSES, CHANNELS, REACH_CONFIG, STATUS_META, feeBreakdown } from '@shared';
 import { Accordion } from '@/components/Accordion';
-import { Funding, ReachLine } from '@/components/campaign';
+import { Funding, ReachLine, SupporterStack } from '@/components/campaign';
+import { ReportSheet } from '@/components/ReportSheet';
 import { Footer } from '@/components/Screen';
 import { StoryView, SourceList } from '@/components/Story';
 import { Banner, Button, Card, DemoBadge, ErrorState, Icon, IconButton, Pill, Skeleton, StatusPill, T, haptic } from '@/components/ui';
 import { api } from '@/lib/api';
 import { formatMoney, formatReach, pct, relTime, shortDate, timeLeft } from '@/lib/format';
-import { useCampaign, useToggle, type Detail } from '@/lib/queries';
+import { useCampaign, useFollowCampaign, useToggle, type Detail } from '@/lib/queries';
 import { useSession } from '@/lib/session';
+import { useBackOrPush } from '@/lib/nav';
+import { shareCampaign } from '@/lib/share';
 import { toast } from '@/lib/toast';
 import { radius, space, useTheme } from '@/theme';
-
-export async function shareCampaign(c: Pick<CampaignSummary, 'id' | 'title' | 'summary'>) {
-  const url = Linking.createURL(`/campaign/${c.id}`);
-  try {
-    await Share.share({ message: `${c.title}\n\n${c.summary}\n\n${url}`, url, title: c.title });
-  } catch {
-    toast('Couldn’t open the share sheet', 'error');
-  }
-}
 
 export default function CampaignScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,6 +25,11 @@ export default function CampaignScreen() {
   const insets = useSafeAreaInsets();
   const q = useCampaign(id);
   const scrollY = useState(() => new Animated.Value(0))[0];
+  const [reportOpen, setReportOpen] = useState(false);
+  const goTo = useBackOrPush();
+  // Where the funding card ends in the scroll content: the sticky bar only appears once it has scrolled away.
+  const [colY, setColY] = useState(0);
+  const [fundEnd, setFundEnd] = useState(0);
 
   if (q.isPending) return <DetailSkeleton />;
   if (q.isError || !q.data)
@@ -44,12 +42,32 @@ export default function CampaignScreen() {
 
   const d = q.data;
   const headerOpacity = scrollY.interpolate({ inputRange: [180, 240], outputRange: [0, 1], extrapolate: 'clamp' });
-  const backable = d.status === 'FUNDING';
+  const backable = BACKABLE_STATUSES.includes(d.status);
+  const passed = fundEnd ? colY + fundEnd - (insets.top + 52) : 1e6;
+  const footerShift = scrollY.interpolate({ inputRange: [passed - 40, passed], outputRange: [140, 0], extrapolate: 'clamp' });
+  const footerFade = scrollY.interpolate({ inputRange: [passed - 40, passed], outputRange: [0, 1], extrapolate: 'clamp' });
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       {/* Compact header fades in once the cover scrolls away */}
-      <Animated.View pointerEvents="none" style={{ position: 'absolute', zIndex: 2, top: 0, left: 0, right: 0, paddingTop: insets.top, height: insets.top + 52, backgroundColor: c.bg, borderBottomWidth: 1, borderBottomColor: c.border, opacity: headerOpacity, justifyContent: 'center', paddingLeft: 60, paddingRight: 112 }}>
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          zIndex: 2,
+          top: 0,
+          left: 0,
+          right: 0,
+          paddingTop: insets.top,
+          height: insets.top + 52,
+          backgroundColor: c.bg,
+          borderBottomWidth: 1,
+          borderBottomColor: c.border,
+          opacity: headerOpacity,
+          justifyContent: 'center',
+          paddingLeft: 60,
+          paddingRight: 112,
+        }}>
         <T variant="bodyStrong" numberOfLines={1}>
           {d.title}
         </T>
@@ -65,10 +83,10 @@ export default function CampaignScreen() {
       <Animated.ScrollView
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
         scrollEventThrottle={16}
-        contentContainerStyle={{ paddingBottom: space.xxxl }}>
+        contentContainerStyle={{ paddingBottom: 120 }}>
         <Image source={d.coverImage} style={{ width: '100%', aspectRatio: 4 / 3, backgroundColor: c.skeleton }} contentFit="cover" accessibilityLabel={`Cover image for ${d.title}`} />
 
-        <View style={{ paddingHorizontal: space.xl, paddingTop: space.xl, gap: space.lg }}>
+        <View onLayout={(e) => setColY(e.nativeEvent.layout.y)} style={{ paddingHorizontal: space.xl, paddingTop: space.xl, gap: space.lg }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm }}>
             <T variant="overline" color="primary">
               {d.category}
@@ -79,7 +97,10 @@ export default function CampaignScreen() {
           <T variant="display">{d.title}</T>
           <View style={{ gap: 2 }}>
             <T variant="bodyStrong">
-              by {d.creatorName} <T variant="small" color="textMuted">· {d.creatorType}</T>
+              by {d.creatorName}{' '}
+              <T variant="small" color="textMuted">
+                · {d.creatorType}
+              </T>
             </T>
             <T variant="small" color="textMuted">
               {d.publishedAt ? `Published ${shortDate(d.publishedAt)}` : d.submittedAt ? `Submitted ${shortDate(d.submittedAt)}` : 'Not yet submitted'}
@@ -89,17 +110,27 @@ export default function CampaignScreen() {
             {d.summary}
           </T>
 
-          {d.isOwner && (
+          {!!d.isOwner && (
             <Banner
               tone="info"
               icon="person-circle-outline"
               title="This is your campaign"
               body={STATUS_META[d.status].description}
-              action={<Button label="Manage campaign" size="sm" variant="secondary" style={{ alignSelf: 'flex-start', marginTop: 6 }} onPress={() => router.push({ pathname: '/manage/[id]', params: { id: d.id } })} />}
+              action={
+                <Button
+                  label="Manage campaign"
+                  size="sm"
+                  variant="secondary"
+                  style={{ alignSelf: 'flex-start', marginTop: 6 }}
+                  onPress={() => goTo('manage/[id]', { pathname: '/manage/[id]', params: { id: d.id } }, d.id)}
+                />
+              }
             />
           )}
 
-          <FundingCard d={d} />
+          <View onLayout={(e) => setFundEnd(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}>
+            <FundingCard d={d} />
+          </View>
         </View>
 
         <View style={{ paddingHorizontal: space.xl, paddingTop: space.xxxl }}>
@@ -114,7 +145,12 @@ export default function CampaignScreen() {
           <Audience d={d} />
           <Accordion title="Review & trust" icon="shield-checkmark-outline" summary="What we checked, and what we didn’t">
             <T>Every campaign is reviewed by our team before it can be published or advertised:</T>
-            {['Claims checked against the sources listed', 'Images and ads checked against advertising policies', 'Targeting checked: adults only, no sensitive categories', 'Budget and channels confirmed before ads launch'].map((x) => (
+            {[
+              'Claims checked against the sources listed',
+              'Images and ads checked against advertising policies',
+              'Targeting checked: adults only, no sensitive categories',
+              'Budget and channels confirmed before ads launch',
+            ].map((x) => (
               <Bullet key={x} text={x} />
             ))}
             <T variant="small" color="textMuted">
@@ -123,10 +159,28 @@ export default function CampaignScreen() {
             <T variant="smallStrong">Sources ({d.story.sources.length})</T>
             <SourceList sources={d.story.sources} />
           </Accordion>
-          <Accordion title="Distribution partners" icon="git-network-outline" summary="Where the ads are bought" last>
+          <Accordion title="Distribution partners" icon="git-network-outline" summary="Where the ads are bought">
             <T>Ads are bought through standard advertising networks for the channels shown above. Partners deliver and measure the ads; they don’t see backer details.</T>
-            <Button label="About our partners" variant="ghost" size="sm" iconRight="arrow-forward" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} onPress={() => router.push('/info/partners')} />
+            <Button
+              label="About our partners"
+              variant="ghost"
+              size="sm"
+              iconRight="arrow-forward"
+              style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
+              onPress={() => router.push('/info/partners')}
+            />
           </Accordion>
+          {!d.isOwner && (
+            <Pressable accessibilityRole="button" onPress={() => setReportOpen(true)} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.lg }}>
+              <Icon name="flag-outline" size={18} color={c.textMuted} />
+              <T variant="small" color="textMuted">
+                Something wrong with this campaign?{' '}
+                <T variant="smallStrong" color="danger">
+                  Report it
+                </T>
+              </T>
+            </Pressable>
+          )}
         </View>
 
         {(d.status === 'PROMOTING' || d.status === 'COMPLETED') && (
@@ -169,7 +223,7 @@ export default function CampaignScreen() {
             </T>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
               {d.publicBackers.map((b, i) => (
-                <Pill key={i} label={b.name} icon="person-outline" />
+                <Pill key={i} label={b.name} />
               ))}
               {d.backerCount > d.publicBackers.length && <Pill label={`+ ${(d.backerCount - d.publicBackers.length).toLocaleString('en-US')} private`} />}
             </View>
@@ -178,24 +232,31 @@ export default function CampaignScreen() {
 
         {d.status !== 'DRAFT' && !d.isOwner && <FeedbackPrompt id={d.id} />}
       </Animated.ScrollView>
+      <ReportSheet campaignId={d.id} visible={reportOpen} onClose={() => setReportOpen(false)} />
 
-      <Footer>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-          <View style={{ flex: 1 }}>
-            <T variant="bodyStrong">
-              {formatMoney(d.raised)} <T variant="small" color="textMuted">of {formatMoney(d.goal)} · {pct(d.raised, d.goal)}%</T>
-            </T>
-            <T variant="small" color="textMuted" numberOfLines={1}>
-              {backable ? timeLeft(d.endsAt) : STATUS_META[d.status].label} · ≈ {formatReach(d.reachAtGoal)} reach (est.)
-            </T>
+      {/* Sticky bar: slides in only after the funding card (which has its own actions) has scrolled away. */}
+      <Animated.View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, opacity: footerFade, transform: [{ translateY: footerShift }] }}>
+        <Footer>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+            <View style={{ flex: 1 }}>
+              <T variant="bodyStrong" numberOfLines={1}>
+                {formatMoney(d.raised)}{' '}
+                <T variant="small" color="textMuted">
+                  of {formatMoney(d.goal)} · {pct(d.raised, d.goal)}%
+                </T>
+              </T>
+              <T variant="small" color="textMuted" numberOfLines={1}>
+                {backable ? timeLeft(d.endsAt) : STATUS_META[d.status].label} · ≈ {formatReach(d.reachAtGoal)} reach (est.)
+              </T>
+            </View>
+            {backable ? (
+              <Button label="Back this" icon="hand-heart" onPress={() => router.push({ pathname: '/back/[id]', params: { id: d.id } })} />
+            ) : (
+              <Button label="Share" icon="share-outline" variant="secondary" onPress={() => shareCampaign(d)} />
+            )}
           </View>
-          {backable ? (
-            <Button label="Back this" icon="megaphone-outline" onPress={() => router.push({ pathname: '/back/[id]', params: { id: d.id } })} />
-          ) : (
-            <Button label="Share" icon="share-outline" variant="secondary" onPress={() => shareCampaign(d)} />
-          )}
-        </View>
-      </Footer>
+        </Footer>
+      </Animated.View>
     </View>
   );
 }
@@ -216,29 +277,32 @@ function SaveButton({ d }: { d: Detail }) {
 }
 
 function FundingCard({ d }: { d: Detail }) {
-  const follow = useToggle('follow', d.id);
-  const backable = d.status === 'FUNDING';
+  const follow = useFollowCampaign();
+  const backable = BACKABLE_STATUSES.includes(d.status);
   return (
     <Card style={{ gap: space.md }}>
       <Funding c={d} />
+      <SupporterStack count={d.backerCount} names={d.publicBackers.map((b) => b.name)} cta={backable} />
       <ReachLine people={d.reachAtGoal} factor={d.reachFactor} />
-      {d.status === 'FUNDED' && <Banner tone="success" icon="checkmark-circle" body="Goal reached. The team is preparing distribution; ads haven’t launched yet." />}
+      {d.status === 'FUNDED' && (
+        <Banner tone="success" icon="checkmark-circle" body="Goal reached! You can still back it: extra funds show the message to even more people. Ads haven’t launched yet." />
+      )}
       {d.status === 'DISTRIBUTION_PREP' && <Banner tone="info" icon="construct-outline" body="Funding closed. Targeting and budget are being finalised before ads launch." />}
       {d.status === 'PROMOTING' && <Banner tone="success" icon="radio-outline" body="Ads are running now. Delivery numbers update in the report." />}
       <View style={{ flexDirection: 'row', gap: space.sm }}>
-        {backable && <Button label="Back this campaign" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/back/[id]', params: { id: d.id } })} />}
+        {backable && <Button label="Back this" icon="megaphone-outline" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/back/[id]', params: { id: d.id } })} />}
         <Button
           label={d.isFollowing ? 'Following' : 'Follow'}
           icon={d.isFollowing ? 'checkmark' : 'notifications-outline'}
           variant="secondary"
           style={!backable && { flex: 1 }}
           onPress={() => {
-            follow.mutate(!d.isFollowing);
-            toast(d.isFollowing ? 'Unfollowed' : 'You’ll get updates on this campaign');
+            follow.mutate({ id: d.id, on: !d.isFollowing });
+            toast(d.isFollowing ? 'Unfollowed' : 'Following. Updates will appear in Activity → Following.');
           }}
         />
       </View>
-      {d.isDemo && (
+      {!!d.isDemo && (
         <T variant="small" color="textSubtle">
           Figures on sample campaigns are demonstration data.
         </T>
@@ -248,11 +312,15 @@ function FundingCard({ d }: { d: Detail }) {
 }
 
 function UseOfFunds({ d }: { d: Detail }) {
-  const f = feeBreakdown(10);
+  const f = feeBreakdown(500);
   return (
-    <Accordion title="How your contribution is used" icon="pie-chart-outline" summary={`${Math.round((1 - REACH_CONFIG.platformFeeRate) * 100)}% goes to advertising`} initiallyOpen={d.status === 'FUNDING'}>
+    <Accordion
+      title="How your contribution is used"
+      icon="pie-chart-outline"
+      summary={`${Math.round((1 - REACH_CONFIG.platformFeeRate) * 100)}% goes to advertising`}
+      initiallyOpen={d.status === 'FUNDING'}>
       <Banner tone="accent" icon="information-circle-outline" body="This is not a donation to the cause. Your contribution pays to show this message to more people." />
-      <T variant="smallStrong">For every $10 you contribute</T>
+      <T variant="smallStrong">For every ₹500 you contribute</T>
       <Line k="Advertising for this message" v={formatMoney(f.adBudget, true)} strong />
       <Line k={`Platform share (${Math.round(REACH_CONFIG.platformFeeRate * 100)}%) for review, ad setup and reporting`} v={formatMoney(f.platformFee, true)} />
       <Line k="Card processing, added at checkout" v={`+ ${formatMoney(f.processingFee, true)}`} />
@@ -263,7 +331,14 @@ function UseOfFunds({ d }: { d: Detail }) {
       <Bullet text="If the campaign is cancelled or not approved for distribution, you get a full refund." />
       <Bullet text="If the goal isn’t reached, the team either runs a smaller campaign with what was raised or refunds backers. You’ll be notified either way." />
       <Bullet text="Unspent ad budget at the end of a campaign is refunded proportionally." />
-      <Button label="Read the full funding policy" variant="ghost" size="sm" iconRight="arrow-forward" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} onPress={() => router.push('/info/terms')} />
+      <Button
+        label="Read the full funding policy"
+        variant="ghost"
+        size="sm"
+        iconRight="arrow-forward"
+        style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
+        onPress={() => router.push('/info/terms')}
+      />
     </Accordion>
   );
 }
@@ -316,7 +391,7 @@ const Line = ({ k, v, strong }: { k: string; v: string; strong?: boolean }) => (
   </View>
 );
 
-export function Bullet({ text }: { text: string }) {
+function Bullet({ text }: { text: string }) {
   const { c } = useTheme();
   return (
     <View style={{ flexDirection: 'row', gap: space.sm }}>
@@ -347,7 +422,7 @@ function FeedbackPrompt({ id }: { id: string }) {
         </View>
         <FeedbackQuestion label="Did the visuals make you want to keep reading?" value={answers.VISUALS} onAnswer={(a) => ask('VISUALS', a)} />
         <FeedbackQuestion label="Did this change your mind about the issue?" value={answers.MIND_CHANGED} onAnswer={(a) => ask('MIND_CHANGED', a)} />
-        {done && (
+        {!!done && (
           <T variant="small" color="success">
             Thanks, your feedback was recorded.
           </T>
@@ -371,7 +446,16 @@ function FeedbackQuestion({ label, value, onAnswer }: { label: string; value?: s
               accessibilityRole="radio"
               accessibilityState={{ selected: sel }}
               onPress={() => onAnswer(a)}
-              style={{ flex: 1, height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: sel ? c.primary : c.border, backgroundColor: sel ? c.primarySoft : c.surface, alignItems: 'center', justifyContent: 'center' }}>
+              style={{
+                flex: 1,
+                height: 44,
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderColor: sel ? c.primary : c.border,
+                backgroundColor: sel ? c.primarySoft : c.surface,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
               <T variant="smallStrong" color={sel ? 'primary' : 'text'}>
                 {a === 'NO' ? 'No' : a === 'SOMEWHAT' ? 'Somewhat' : 'Yes'}
               </T>

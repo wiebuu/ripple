@@ -23,7 +23,7 @@ export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
 
 export const TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
   DRAFT: ['SUBMITTED', 'CANCELLED'],
-  SUBMITTED: ['APPROVED', 'CHANGES_REQUESTED', 'REJECTED'],
+  SUBMITTED: ['APPROVED', 'CHANGES_REQUESTED', 'REJECTED', 'CANCELLED'],
   CHANGES_REQUESTED: ['SUBMITTED', 'CANCELLED'],
   APPROVED: ['FUNDING', 'CANCELLED'],
   FUNDING: ['FUNDED', 'FUNDING_ENDED', 'CANCELLED'],
@@ -53,7 +53,8 @@ export const PUBLIC_STATUSES: CampaignStatus[] = [
   'COMPLETED',
 ];
 
-export const BACKABLE_STATUSES: CampaignStatus[] = ['FUNDING'];
+/** Backing stays open after the goal is reached (extra funds buy more reach) until distribution prep starts. */
+export const BACKABLE_STATUSES: CampaignStatus[] = ['FUNDING', 'FUNDED'];
 
 export const STATUS_META: Record<
   CampaignStatus,
@@ -64,7 +65,7 @@ export const STATUS_META: Record<
   CHANGES_REQUESTED: { label: 'Changes requested', tone: 'warning', description: 'A reviewer asked for edits before approval.' },
   APPROVED: { label: 'Approved', tone: 'success', description: 'Approved and about to open for backing.' },
   FUNDING: { label: 'Open for backing', tone: 'info', description: 'Backers can contribute toward distribution.' },
-  FUNDED: { label: 'Goal reached', tone: 'success', description: 'Goal reached. Advertising has not launched yet.' },
+  FUNDED: { label: 'Goal reached', tone: 'success', description: 'Goal reached and still open for backing: extra funds add reach. Advertising has not launched yet.' },
   FUNDING_ENDED: { label: 'Funding ended', tone: 'neutral', description: 'The funding period ended before the goal.' },
   DISTRIBUTION_PREP: { label: 'Preparing distribution', tone: 'info', description: 'Ads are being set up and checked before launch.' },
   PROMOTING: { label: 'Promoting', tone: 'success', description: 'The message is being shown to new audiences.' },

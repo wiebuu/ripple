@@ -26,7 +26,7 @@ export class ApiError extends Error {
   }
 }
 
-type Opts = { method?: string; body?: unknown; auth?: boolean; form?: FormData };
+type Opts = { method?: string; body?: unknown; auth?: boolean; form?: FormData; retried?: boolean };
 
 export async function api<T = any>(path: string, opts: Opts = {}): Promise<T> {
   const token = opts.auth === false ? null : await useSession.getState().ensureToken();
@@ -45,6 +45,11 @@ export async function api<T = any>(path: string, opts: Opts = {}): Promise<T> {
   }
   const json = await res.json().catch(() => null);
   if (!res.ok) {
+    if (res.status === 401 && token && !opts.retried && !path.startsWith('/auth')) {
+      // The saved session is no longer valid: start a fresh guest session and retry once.
+      useSession.getState().reset();
+      return api<T>(path, { ...opts, retried: true });
+    }
     if (res.status === 401) useSession.getState().reset();
     throw new ApiError(res.status, json?.error ?? 'Something went wrong', json?.details);
   }

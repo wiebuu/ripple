@@ -5,6 +5,10 @@ import { Animated } from 'react-native';
  * Instagram-style header: it stays put for the first `delay` points of
  * scrolling, then slides away so content gets the full screen, and slides
  * back as soon as the user scrolls up again.
+ *
+ * Lists under the header should pad their content by the header's height and
+ * pass the same value as RefreshControl's progressViewOffset (honoured on both
+ * iOS and Android) so the pull-to-refresh spinner appears just below it.
  */
 export function useCollapsingHeader(delay = 96) {
   const [scrollY] = useState(() => new Animated.Value(0));

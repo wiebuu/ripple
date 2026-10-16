@@ -1,6 +1,6 @@
 /**
  * End-to-end API smoke test against a running server (reseeds first is recommended).
- * Usage: API=http://localhost:4000 npm run smoke
+ * Usage: start the API with ALLOW_SIMULATED_PAYMENTS=1, then API=http://localhost:4000 npm run smoke
  */
 import { emptyDraft } from '../../../shared';
 
@@ -60,7 +60,7 @@ function check(name: string, ok: boolean, extra?: unknown) {
   d.story.sources = [{ id: 's1', title: 'Source', url: 'https://example.org/x' }];
   d.visuals = { ...d.visuals, coverImage: 'https://example.org/a.jpg', adImages: ['https://example.org/a.jpg'], adHeadline: 'Hi', adDescription: 'Desc' };
   d.reach.locations = ['Somewhere'];
-  d.goal = 300;
+  d.goal = 10000;
   d.acceptedRules = true;
   await call('PATCH', `/drafts/${id}`, guest.token, { content: d });
   const ok = await call('POST', `/drafts/${id}/submit`, guest.token);
@@ -78,17 +78,19 @@ function check(name: string, ok: boolean, extra?: unknown) {
   const appr = await call('POST', `/review/campaigns/${id}/decision`, reviewer.token, { action: 'approve' });
   check('approve opens for funding', appr.json.status === 'FUNDING', appr.json);
 
-  const k = await call('POST', '/contributions', guest.token, { campaignId: id, amount: 50, showName: false });
-  check('server computes fees', k.json.platformFee === 4 && k.json.processingFee === 1.75 && k.json.total === 51.75, k.json);
+  const k = await call('POST', '/contributions', guest.token, { campaignId: id, amount: 500, showName: false });
+  check('server computes fees in rupees', k.json.platformFee === 40 && k.json.processingFee === 10 && k.json.total === 510, k.json);
   const declined = await call('POST', `/contributions/${k.json.id}/pay`, guest.token, { cardNumber: '4000 0000 0000 0002', expiry: '12/30', cvc: '123', name: 'T' });
   check('declined card -> FAILED, nothing raised', declined.json.contribution.status === 'FAILED' && declined.json.campaign.raised === 0, declined.json);
 
-  const k2 = await call('POST', '/contributions', guest.token, { campaignId: id, amount: 300 });
+  const k2 = await call('POST', '/contributions', guest.token, { campaignId: id, amount: 10000 });
   const paid = await call('POST', `/contributions/${k2.json.id}/pay`, guest.token, { cardNumber: '4242424242424242', expiry: '12/30', cvc: '123', name: 'T' });
-  check('success -> raised updated', paid.json.contribution.status === 'SUCCEEDED' && paid.json.campaign.raised === 300, paid.json);
+  check('success -> raised updated', paid.json.contribution.status === 'SUCCEEDED' && paid.json.campaign.raised === 10000, paid.json);
   check('reaching goal -> FUNDED, not PROMOTING', paid.json.campaign.status === 'FUNDED', paid.json.campaign.status);
   const again = await call('POST', `/contributions/${k2.json.id}/pay`, guest.token, { cardNumber: '4242424242424242', expiry: '12/30', cvc: '123', name: 'T' });
   check('cannot pay twice', again.status === 409);
+  const extra = await call('POST', '/contributions', guest.token, { campaignId: id, amount: 2000 });
+  check('backing stays open past the goal', extra.status === 201, extra.json);
 
   await call('POST', `/review/campaigns/${id}/transition`, reviewer.token, { to: 'DISTRIBUTION_PREP' });
   const blocked = await call('POST', `/review/campaigns/${id}/transition`, reviewer.token, { to: 'PROMOTING' });
@@ -106,6 +108,38 @@ function check(name: string, ok: boolean, extra?: unknown) {
 
   const ai = await call('POST', '/ai/draft', guest.token, { answers: { about: 'We want the city to plant trees on hot streets.', audience: 'Residents', why: 'Heat is dangerous.', evidence: '' } });
   check('AI draft returns suggestion without a goal', ai.status === 200 && ai.json.suggestion.title && !('goal' in ai.json.suggestion), ai.json);
+
+  // Reports & moderation
+  const air = (await call('GET', '/campaigns/air-quality-block-by-block')).json;
+  const report = await call('POST', `/campaigns/${air.id}/complaints`, guest.token, { reason: 'SOURCES', details: 'Broken link' });
+  const dup = await call('POST', `/campaigns/${air.id}/complaints`, guest.token, { reason: 'SOURCES' });
+  check('audience can report a campaign once', report.status === 201 && dup.status === 409, [report.status, dup.status]);
+  const rd = await call('GET', `/review/campaigns/${air.id}`, reviewer.token);
+  const done2 = await call('POST', `/review/complaints/${rd.json.complaints[0].id}`, reviewer.token, { action: 'dismiss', note: 'Sources verified.' });
+  const audit = (await call('GET', `/review/campaigns/${air.id}`, reviewer.token)).json.audit;
+  check('reviewer closes report and it is audited', done2.json.status === 'DISMISSED' && audit.some((a: any) => a.action === 'MODERATION'), done2.json);
+
+  // Creator cancels a funded-in-progress campaign -> backers refunded
+  const d2 = emptyDraft('Cancel Tester');
+  Object.assign(d2.basics, { title: 'Cancel test', category: 'Community', summary: 'x' });
+  d2.story = { ...d2.story, intro: 'Intro.', sources: [{ id: 's', title: 'S', url: 'https://example.org/s' }] };
+  d2.visuals = { ...d2.visuals, coverImage: 'https://example.org/a.jpg', adImages: ['https://example.org/a.jpg'] };
+  d2.reach.locations = ['Here'];
+  d2.goal = 20000;
+  d2.acceptedRules = true;
+  const c2 = (await call('POST', '/drafts', guest.token, { content: d2 })).json.id;
+  await call('POST', `/drafts/${c2}/submit`, guest.token);
+  await call('POST', `/review/campaigns/${c2}/decision`, reviewer.token, { action: 'approve' });
+  const k3 = (await call('POST', '/contributions', creator.token, { campaignId: c2, amount: 1000 })).json;
+  await call('POST', `/contributions/${k3.id}/pay`, creator.token, { cardNumber: '4242424242424242', expiry: '12/30', cvc: '123', name: 'T' });
+  const cancel = await call('POST', `/drafts/${c2}/cancel`, guest.token, { reason: 'Changed plans' });
+  const after = (await call('GET', `/contributions/${k3.id}`, creator.token)).json;
+  check('creator cancel refunds backers', cancel.status === 200 && after.contribution.status === 'REFUNDED' && after.campaign.status === 'CANCELLED', [cancel.json, after.contribution?.status, after.campaign?.status]);
+  const notOwner = await call('POST', `/drafts/${c2}/cancel`, creator.token);
+  check("can't cancel someone else's campaign", notOwner.status === 403, notOwner.status);
+
+  const rz = await call('POST', `/contributions/${k3.id}/razorpay/order`, creator.token);
+  check('Razorpay unavailable without test keys', rz.status === 503, rz.status);
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
