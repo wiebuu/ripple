@@ -135,7 +135,7 @@ function HomeIntro({ featured }: { featured: ReturnType<typeof useCampaigns> }) 
               </T>
             </Pressable>
             <Pressable accessibilityRole="button" onPress={() => { haptic.light(); router.navigate('/create'); }} style={({ pressed }) => ({ flex: 1, height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
-              <T variant="bodyStrong">Start one</T>
+              <T variant="bodyStrong">Start a campaign</T>
             </Pressable>
           </View>
         </View>

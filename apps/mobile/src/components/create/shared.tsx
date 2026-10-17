@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { STEPS, type DraftContent, type Errors } from '@shared';
+import { STEP_SHORT, STEPS, type DraftContent, type Errors } from '@shared';
 import type { SaveState } from '@/lib/draft';
 import { relTime } from '@/lib/format';
 import { radius, space, useTheme } from '@/theme';
@@ -18,14 +18,14 @@ export function StepProgress({ step, onJump, invalid }: { step: number; onJump: 
   const { c } = useTheme();
   return (
     <View style={{ flexDirection: 'row', gap: 4, paddingHorizontal: space.xl, paddingBottom: space.sm }} accessibilityLabel={`Step ${step + 1} of 5: ${STEPS[step]}`}>
-      {STEPS.map((s, i) => {
+      {STEP_SHORT.map((s, i) => {
         const active = i === step;
         const done = i < step;
         return (
           <Pressable
             key={s}
             accessibilityRole="button"
-            accessibilityLabel={`Go to step ${i + 1}, ${s}${invalid[i] && done ? ', needs attention' : ''}`}
+            accessibilityLabel={`Go to step ${i + 1}, ${STEPS[i]}${invalid[i] && done ? ', needs attention' : ''}`}
             accessibilityState={{ selected: active }}
             onPress={() => {
               haptic.light();

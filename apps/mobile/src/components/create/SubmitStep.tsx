@@ -48,7 +48,7 @@ export function SubmitStep({ d, update, errors, onJump }: StepProps & { onJump: 
         ))}
       </Section>
 
-      <Section {...sec} title="Visuals" step={2}>
+      <Section {...sec} title={STEPS[2]} step={2}>
         <T variant="small" color="textMuted">
           {d.visuals.adImages.length} ad image{d.visuals.adImages.length === 1 ? '' : 's'}
           {d.visuals.adVideo ? ' · 1 video' : ''} · button “{d.visuals.ctaText}”

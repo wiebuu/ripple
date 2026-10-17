@@ -1,7 +1,7 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BackHandler, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
-import { STATUS_META, STEP_VALIDATORS, STEPS, firstInvalidStep, validateAll } from '@shared';
+import { STATUS_META, STEP_SHORT, STEP_VALIDATORS, STEPS, firstInvalidStep, validateAll } from '@shared';
 import { BasicsStep } from '@/components/create/BasicsStep';
 import { ReachStep } from '@/components/create/ReachStep';
 import { SaveIndicator, StepProgress } from '@/components/create/shared';
@@ -178,7 +178,7 @@ export default function CampaignEditor() {
         {step < 4 ? (
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             <Button label="Save draft" variant="secondary" style={{ flex: 1 }} onPress={async () => { await ed.saveNow(); toast('Draft saved. Resume any time from Create.'); exit(); }} />
-            <Button label={`Next: ${STEPS[step + 1]}`} iconRight="arrow-forward" style={{ flex: 1.6 }} onPress={next} />
+            <Button label={`Next: ${STEP_SHORT[step + 1]}`} iconRight="arrow-forward" style={{ flex: 1.6 }} onPress={next} />
           </View>
         ) : (
           <>

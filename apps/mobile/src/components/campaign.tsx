@@ -817,7 +817,7 @@ export function PostCard({ c: campaign }: { c: CampaignSummary }) {
           </T>
           <T variant="small" color="textSubtle" style={{ fontSize: 12, marginTop: 2 }}>
             {campaign.backerCount.toLocaleString('en-IN')} backers
-            {left ? ` · ${left}` : ''} · ≈ {formatReach(campaign.reachAtGoal)} reach at goal
+            {left ? ` · ${left}` : ''} · Est. reach at goal ≈ {formatReach(campaign.reachAtGoal)} people
           </T>
         </View>
       </Pressable>

@@ -15,7 +15,9 @@ export const CTA_MAX = 20;
 export const GOAL_MIN = 10000;
 export const GOAL_MAX = 5000000;
 
-export const STEPS = ['Basics', 'Story', 'Visuals', 'Reach', 'Submit'] as const;
+export const STEPS = ['Basics', 'Story', 'Campaign & Ad Visuals', 'Reach', 'Submit'] as const;
+/** Short names for tight spots: the five-step progress bar and the Next button. */
+export const STEP_SHORT = ['Basics', 'Story', 'Visuals', 'Reach', 'Submit'] as const;
 export type StepKey = (typeof STEPS)[number];
 
 export function isUrl(s: string) {
