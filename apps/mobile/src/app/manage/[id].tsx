@@ -52,8 +52,8 @@ export default function Manage() {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title="Manage campaign" right={isPublic ? <IconButton icon="share-outline" label="Share campaign" onPress={() => shareCampaign(d)} /> : undefined} />
       {pull.indicator()}
-      <PullArea pull={pull}>
-      <Body refreshControl={pull.control()} onScroll={pull.onScroll} scrollEventThrottle={16}>
+      <PullArea pull={pull} scrollInside>
+      <Body refreshControl={pull.control()} onScroll={pull.onScroll} scrollEventThrottle={16} scrollGesture={pull.scrollGesture}>
         <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'center' }}>
           {d.coverImage ? (
             <Image source={d.coverImage} style={{ width: 72, height: 72, borderRadius: radius.md }} contentFit="cover" />

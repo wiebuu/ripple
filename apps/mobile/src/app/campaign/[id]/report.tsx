@@ -52,8 +52,8 @@ export default function Report() {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title={r.final ? 'Final report' : 'Distribution report'} subtitle={cp.title} />
       {pull.indicator()}
-      <PullArea pull={pull}>
-      <Body refreshControl={pull.control()} onScroll={pull.onScroll} scrollEventThrottle={16}>
+      <PullArea pull={pull} scrollInside>
+      <Body refreshControl={pull.control()} onScroll={pull.onScroll} scrollEventThrottle={16} scrollGesture={pull.scrollGesture}>
         <View style={{ flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' }}>
           <Pill label={r.final ? 'Final' : 'In progress'} tone={r.final ? 'success' : 'info'} />
           {cp.isDemo && <DemoBadge />}

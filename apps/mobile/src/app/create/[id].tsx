@@ -2,6 +2,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BackHandler, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { STATUS_META, STEP_SHORT, STEP_VALIDATORS, STEPS, firstInvalidStep, validateAll } from '@shared';
+import { AutofillBar } from '@/components/create/AutofillBar';
 import { BasicsStep } from '@/components/create/BasicsStep';
 import { ReachStep } from '@/components/create/ReachStep';
 import { SaveIndicator, StepProgress } from '@/components/create/shared';
@@ -167,6 +168,7 @@ export default function CampaignEditor() {
         <T variant="overline" color="primary">
           Step {step + 1} of 5 · {STEPS[step]}
         </T>
+        <AutofillBar step={step} update={update} />
         {step === 0 && <BasicsStep {...props} />}
         {step === 1 && <StoryStep {...props} />}
         {step === 2 && <VisualsStep {...props} />}

@@ -89,8 +89,8 @@ export default function ReviewCampaign() {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title="Review campaign" subtitle={STATUS_META[d.status].label} />
       {pull.indicator()}
-      <PullArea pull={pull}>
-      <Body refreshControl={pull.control()} onScroll={pull.onScroll} scrollEventThrottle={16}>
+      <PullArea pull={pull} scrollInside>
+      <Body refreshControl={pull.control()} onScroll={pull.onScroll} scrollEventThrottle={16} scrollGesture={pull.scrollGesture}>
         <View style={{ gap: space.sm }}>
           <StatusPill status={d.status} />
           <T variant="title">{d.title || 'Untitled'}</T>

@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { User } from '@shared';
-import { API_URL } from './api';
+import { API_URL } from './config';
 
 type SessionState = {
   token: string | null;

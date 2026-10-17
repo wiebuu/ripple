@@ -6,6 +6,7 @@ import { emptyDraft } from '@shared';
 import { Footer, Header } from '@/components/Screen';
 import { Banner, Button, Icon, Pill, T, haptic, Toggle } from '@/components/ui';
 import { errorMessage } from '@/lib/api';
+import { WIECODES_ANSWERS } from '@/lib/autofill';
 import { applySuggestion, askAi, startDraft, type VoiceAnswers } from '@/lib/create';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -119,6 +120,19 @@ export default function VoiceCreate() {
         <View style={{ flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' }}>
           <Button label="Hear the question" icon="volume-high-outline" variant="quiet" size="sm" onPress={() => { haptic.light(); Speech.stop(); Speech.speak(`${q.q} ${q.hint}`); }} />
           <Button label="Use a sample answer" icon="flask-outline" variant="quiet" size="sm" onPress={() => setAnswers((a) => ({ ...a, [q.key]: q.sample }))} />
+          <Button
+            label="Auto-fill all answers with AI"
+            icon="sparkles-outline"
+            variant="quiet"
+            size="sm"
+            onPress={() => {
+              haptic.light();
+              Speech.stop();
+              setAnswers(WIECODES_ANSWERS);
+              setI(QUESTIONS.length - 1);
+              toast('All four answers filled for a Wiecodes campaign. Tap “Draft my campaign”.');
+            }}
+          />
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>

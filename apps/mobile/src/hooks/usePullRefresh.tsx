@@ -8,9 +8,13 @@ import { haptic } from '@/components/ui';
 const MAX_SPIN_MS = 10_000;
 /** A refresh shows two full ripples, then the ripple leaves (later only if the data is still loading). */
 const MIN_SPIN_MS = QUICK_MS * 2;
-/** How far the user pulls (pt) before the ripple is fully grown. */
-const PULL = 70;
 const SIZE = 36;
+/** How far the user pulls (pt) before the ripple is fully grown. */
+const PULL = 44;
+/** While the gap is small the ripple hugs its top (this far down), so it shows from the first few points of a pull. */
+const TOP_INSET = 6;
+/** Gap height where the ripple, still at the top, would just fit; beyond this it centres in the gap. */
+const HUG = TOP_INSET * 2 + SIZE;
 /** Height of the gap the content makes for the ripple when the platform doesn't (tab re-tap, Android pull). */
 const ROOM = 64;
 /** Tallest gap the ripple is drawn in; a longer pull just leaves empty space. */
@@ -167,7 +171,7 @@ export function usePullRefresh(refetch: () => unknown, scrollY?: Animated.Value)
       refreshing || leaving
         ? 1
         : dragging
-          ? shift.interpolate({ inputRange: [0, ROOM], outputRange: [0.5, 1], extrapolate: 'clamp' })
+          ? shift.interpolate({ inputRange: [0, PULL], outputRange: [0.5, 1], extrapolate: 'clamp' })
           : y.interpolate({ inputRange: [-PULL, 0], outputRange: [1, 0.5], extrapolate: 'clamp' });
     return (
       // Outer box: everything above the content's top edge is clipped (headers, filters stay clean).
@@ -186,7 +190,8 @@ export function usePullRefresh(refetch: () => unknown, scrollY?: Animated.Value)
                 right: 0,
                 alignItems: 'center',
                 opacity,
-                transform: [{ translateY: gap.interpolate({ inputRange: [0, MAX_GAP], outputRange: [MAX_GAP - SIZE / 2, MAX_GAP / 2 - SIZE / 2] }) }, { scale }],
+                // Position inside the inner box (whose bottom is the content's edge): near the top of a small gap, centred in a big one.
+                transform: [{ translateY: gap.interpolate({ inputRange: [0, HUG, MAX_GAP], outputRange: [TOP_INSET + MAX_GAP, TOP_INSET + MAX_GAP - HUG, MAX_GAP / 2 - SIZE / 2] }) }, { scale }],
               }}>
               <RippleMark size={SIZE} rings={3} quick />
             </Animated.View>
@@ -201,12 +206,16 @@ export function usePullRefresh(refetch: () => unknown, scrollY?: Animated.Value)
   return { refreshing, onRefresh: () => refresh(false), onScroll, control, indicator, slideStyle, gesture, scrollGesture };
 }
 
-/** Wraps a refreshable scroll view: slides it aside for the ripple, and on Android handles the pull gesture. */
-export function PullArea({ pull, children }: { pull: ReturnType<typeof usePullRefresh>; children: ReactNode }) {
+/**
+ * Wraps a refreshable scroll view: slides it aside for the ripple, and on Android handles the pull gesture.
+ * `children` should be the scroll view itself. When it's a wrapper such as Body, pass `scrollInside` and hand
+ * `pull.scrollGesture` to the wrapper, which attaches it to its own scroll view.
+ */
+export function PullArea({ pull, scrollInside, children }: { pull: ReturnType<typeof usePullRefresh>; scrollInside?: boolean; children: ReactNode }) {
   return (
     <GestureDetector gesture={pull.gesture}>
       <Animated.View style={pull.slideStyle} collapsable={false}>
-        <GestureDetector gesture={pull.scrollGesture}>{children}</GestureDetector>
+        {scrollInside ? children : <GestureDetector gesture={pull.scrollGesture}>{children}</GestureDetector>}
       </Animated.View>
     </GestureDetector>
   );

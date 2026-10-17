@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Keyboard, Platform, ScrollView, View, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
+import { GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { space, useTheme } from '@/theme';
 import { IconButton, T } from './ui';
@@ -36,17 +37,26 @@ export function Header({ title, onBack, right, subtitle, back = true }: { title?
 }
 
 /** Scrollable screen body with consistent gutters. */
-export function Body({ children, style, footer, ...rest }: ScrollViewProps & { children: ReactNode; style?: StyleProp<ViewStyle>; footer?: ReactNode }) {
+export function Body({
+  children,
+  style,
+  footer,
+  scrollGesture,
+  ...rest
+}: ScrollViewProps & { children: ReactNode; style?: StyleProp<ViewStyle>; footer?: ReactNode; /** Registers the scroll view with a pull-to-refresh gesture (see PullArea). */ scrollGesture?: GestureType }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const scroll = (
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={[{ padding: space.xl, gap: space.xl, paddingBottom: footer ? space.xl : insets.bottom + space.xxxl }, style]}
+      {...rest}>
+      {children}
+    </ScrollView>
+  );
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[{ padding: space.xl, gap: space.xl, paddingBottom: footer ? space.xl : insets.bottom + space.xxxl }, style]}
-        {...rest}>
-        {children}
-      </ScrollView>
+      {scrollGesture ? <GestureDetector gesture={scrollGesture}>{scroll}</GestureDetector> : scroll}
       {footer && <Footer>{footer}</Footer>}
     </View>
   );
