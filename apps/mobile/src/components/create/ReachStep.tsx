@@ -1,21 +1,48 @@
 import { useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
-import { CHANNELS, channelFactor, peoplePerHundred, type ChannelKey } from '@shared';
+import { CHANNELS, DEFAULT_FUNDING_DAYS, FUNDING_DAY_OPTIONS, PLATFORMS, type PlatformKey, channelFactor, peoplePerHundred, type ChannelKey } from '@shared';
 import { fonts, radius, space, useTheme } from '@/theme';
-import { Banner, Card, Chip, Icon, IconButton, Pill, T, haptic } from '../ui';
+import { Banner, Card, Chip, Icon, IconButton, Pill, T, haptic, type IconName } from '../ui';
 import { AdPreview } from './VisualsStep';
 import { FieldError, Label, StepIntro, type StepProps } from './shared';
 
 const LOCATION_SUGGESTIONS = ['United States', 'California', 'New York, NY', 'Texas', 'Chicago, IL', 'London, UK', 'Toronto, Canada'];
 const INTERESTS = ['Local news', 'Parenting', 'Education', 'Environment', 'Public health', 'Volunteering', 'Small business', 'Transit', 'Arts', 'Science', 'Students', 'Housing'];
 const DURATIONS = [7, 14, 21, 30, 45, 60, 90];
+const NETWORKS = ['Meta', 'Google', 'More'] as const;
+/** Logo and brand colour per app; `null` colour falls back to the text colour (monochrome brands). */
+const PLATFORM_LOGOS: Record<PlatformKey, [IconName, string | null]> = {
+  facebook: ['logo-facebook', '#1877F2'],
+  instagram: ['logo-instagram', '#E1306C'],
+  google_search: ['logo-google', '#4285F4'],
+  youtube: ['logo-youtube', '#FF0033'],
+  google_display: ['logo-google', '#34A853'],
+  tiktok: ['logo-tiktok', null],
+  snapchat: ['logo-snapchat', '#F7C600'],
+  x: ['logo-x', null],
+  linkedin: ['logo-linkedin', '#0A66C2'],
+  reddit: ['logo-reddit', '#FF4500'],
+  pinterest: ['logo-pinterest', '#E60023'],
+};
+const PLACEMENT_ICONS: Record<ChannelKey, IconName> = {
+  social_feed: 'images-outline',
+  stories: 'phone-portrait-outline',
+  search: 'search-outline',
+  news: 'document-text-outline',
+  video: 'videocam-outline',
+};
 
 export function ReachStep({ d, update, errors }: StepProps) {
   const { c } = useTheme();
   const r = d.reach;
   const set = (p: Partial<typeof r>) => update((x) => ({ ...x, reach: { ...x.reach, ...p } }));
   const [loc, setLoc] = useState('');
-  const total = Object.values(r.channels).reduce((a, b) => a + (b ?? 0), 0);
+  const [today] = useState(Date.now);
+  const platforms = r.platforms ?? [];
+  const togglePlatform = (k: PlatformKey) => set({ platforms: platforms.includes(k) ? platforms.filter((x) => x !== k) : [...platforms, k] });
+  const setNetwork = (keys: PlatformKey[], on: boolean) => set({ platforms: on ? [...new Set([...platforms, ...keys])] : platforms.filter((x) => !keys.includes(x)) });
+  const placements = CHANNELS.filter((ch) => r.channels[ch.key]).length;
+  const fundingDays = d.fundingDays ?? DEFAULT_FUNDING_DAYS;
 
   const addLoc = (v: string) => {
     const t = v.trim();
@@ -23,11 +50,10 @@ export function ReachStep({ d, update, errors }: StepProps) {
     set({ locations: [...r.locations, t] });
     setLoc('');
   };
-  const setChannel = (k: ChannelKey, v: number) => {
-    haptic.light();
-    const next = { ...r.channels, [k]: Math.max(0, Math.min(100, v)) };
-    if (!next[k]) delete next[k];
-    set({ channels: next });
+  // Selected placements share the budget evenly; the review team sets the final split.
+  const togglePlacement = (k: ChannelKey) => {
+    const keys = CHANNELS.map((ch) => ch.key).filter((x) => (x === k ? !r.channels[x] : !!r.channels[x]));
+    set({ channels: Object.fromEntries(keys.map((x) => [x, Math.floor(100 / keys.length)])) });
   };
 
   return (
@@ -89,35 +115,66 @@ export function ReachStep({ d, update, errors }: StepProps) {
       </View>
 
       <View style={{ gap: space.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-          <Label text="Channels & budget split" required />
-          <Pill label="Finalised in review" tone="warning" />
+        <View style={{ gap: space.xs }}>
+          <Label text="Apps to advertise on" required hint="Pick the apps where people should see your ads." />
         </View>
-        {CHANNELS.map((ch) => {
-          const v = r.channels[ch.key] ?? 0;
-          const share = total ? Math.round((v / total) * 100) : 0;
+        {NETWORKS.map((net) => {
+          const items = PLATFORMS.filter((p) => p.network === net);
+          const all = items.every((p) => platforms.includes(p.key));
           return (
-            <Card key={ch.key} style={{ gap: space.sm, borderColor: v ? c.primary : c.border }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-                <View style={{ flex: 1 }}>
-                  <T variant="bodyStrong">{ch.label}</T>
-                  <T variant="small" color="textMuted">
-                    {ch.note}
+            <View key={net} style={{ gap: space.sm }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {net !== 'More' && <Icon name={net === 'Meta' ? 'logo-meta' : 'logo-google'} size={14} color={c.textMuted} />}
+                <T variant="overline" color="textMuted" style={{ flex: 1 }}>
+                  {net === 'More' ? 'More apps' : net}
+                </T>
+                <Pressable accessibilityRole="button" accessibilityLabel={`${all ? 'Clear' : 'Select all'} ${net}`} hitSlop={8} onPress={() => setNetwork(items.map((p) => p.key), !all)}>
+                  <T variant="smallStrong" color="primary">
+                    {all ? 'Clear' : 'Select all'}
                   </T>
-                </View>
-                {v ? <T variant="subheading" color="primary">{share}%</T> : null}
+                </Pressable>
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-                <IconButton icon="remove-circle-outline" label={`Less ${ch.label}`} onPress={() => setChannel(ch.key, v - 10)} />
-                <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: c.track }}>
-                  <View style={{ width: `${share}%`, height: 6, borderRadius: 3, backgroundColor: c.primary }} />
-                </View>
-                <IconButton icon="add-circle-outline" label={`More ${ch.label}`} onPress={() => setChannel(ch.key, v + 10)} />
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+                {items.map((p) => (
+                  <PlatformTile key={p.key} k={p.key} label={p.label} on={platforms.includes(p.key)} onPress={() => togglePlatform(p.key)} />
+                ))}
               </View>
-            </Card>
+            </View>
           );
         })}
+        <FieldError error={errors['reach.platforms']} />
+      </View>
+
+      <View style={{ gap: space.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+          <Label text="Ad formats" required />
+          <Pill label="Finalised in review" tone="warning" />
+        </View>
+        <View style={{ borderRadius: radius.md, borderWidth: 1, borderColor: errors['reach.channels'] ? c.danger : c.border, backgroundColor: c.surface, overflow: 'hidden' }}>
+          {CHANNELS.map((ch, i) => (
+            <PlacementRow key={ch.key} icon={PLACEMENT_ICONS[ch.key]} label={ch.label} note={ch.note} on={!!r.channels[ch.key]} first={i === 0} onPress={() => togglePlacement(ch.key)} />
+          ))}
+        </View>
+        <T variant="small" color="textMuted">
+          {placements} selected · budget is shared evenly
+        </T>
         <FieldError error={errors['reach.channels']} />
+      </View>
+
+      <View style={{ gap: space.sm }}>
+        <Label text="Campaign live for" required hint="How long people can back it once approved. A live countdown shows on your campaign." />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+          {FUNDING_DAY_OPTIONS.map((n) => (
+            <Chip key={n} label={`${n} days`} selected={fundingDays === n} onPress={() => update((x) => ({ ...x, fundingDays: n }))} />
+          ))}
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Icon name="time-outline" size={14} color={c.textMuted} />
+          <T variant="small" color="textMuted">
+            If approved today, backing closes {new Date(today + fundingDays * 864e5).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          </T>
+        </View>
+        <FieldError error={errors.fundingDays} />
       </View>
 
       <View style={{ gap: space.sm }}>
@@ -171,5 +228,71 @@ function Stepper({ label, value, min, max, onChange, suffix = '' }: { label: str
         <Icon name="add" size={20} color={value < max ? c.text : c.textSubtle} />
       </Pressable>
     </View>
+  );
+}
+
+function PlacementRow({ icon, label, note, on, first, onPress }: { icon: IconName; label: string; note: string; on: boolean; first: boolean; onPress: () => void }) {
+  const { c } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: on }}
+      accessibilityLabel={label}
+      onPress={() => {
+        haptic.light();
+        onPress();
+      }}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, paddingHorizontal: space.lg, borderTopWidth: first ? 0 : 1, borderTopColor: c.border, backgroundColor: pressed ? c.surfaceAlt : 'transparent' })}>
+      <View style={{ width: 36, height: 36, borderRadius: radius.sm, backgroundColor: on ? c.primarySoft : c.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={icon} size={18} color={on ? c.primary : c.textMuted} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <T variant="bodyStrong">{label}</T>
+        <T variant="small" color="textMuted" numberOfLines={1}>
+          {note}
+        </T>
+      </View>
+      <Icon name={on ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={on ? c.primary : c.textSubtle} />
+    </Pressable>
+  );
+}
+
+function PlatformTile({ k, label, on, onPress }: { k: PlatformKey; label: string; on: boolean; onPress: () => void }) {
+  const { c } = useTheme();
+  const [logo, brand] = PLATFORM_LOGOS[k];
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: on }}
+      accessibilityLabel={label}
+      onPress={() => {
+        haptic.light();
+        onPress();
+      }}
+      style={({ pressed }) => ({
+        flexBasis: '31%',
+        flexGrow: 1,
+        maxWidth: '33%',
+        height: 76,
+        borderRadius: radius.md,
+        borderWidth: on ? 1.5 : 1,
+        borderColor: on ? c.primary : c.border,
+        backgroundColor: on ? c.primarySoft : c.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingHorizontal: 4,
+        opacity: pressed ? 0.85 : 1,
+      })}>
+      <Icon name={logo} size={24} color={brand ?? c.text} />
+      <T variant="small" numberOfLines={1} style={{ fontSize: 12, color: on ? c.text : c.textMuted }}>
+        {label}
+      </T>
+      {on && (
+        <View style={{ position: 'absolute', top: 6, right: 6 }}>
+          <Icon name="checkmark-circle" size={16} color={c.primary} />
+        </View>
+      )}
+    </Pressable>
   );
 }

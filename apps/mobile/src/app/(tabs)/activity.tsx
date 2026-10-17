@@ -11,6 +11,7 @@ import { relTime } from '@/lib/format';
 import { queryClient, useNotificationFeed } from '@/lib/queries';
 import { KIND_META } from '@/lib/kinds';
 import { radius, space, useTheme } from '@/theme';
+import { usePullRefresh } from '@/hooks/usePullRefresh';
 
 type Row = { type: 'header'; label: string } | { type: 'item'; n: AppNotification };
 
@@ -39,15 +40,9 @@ export default function Activity() {
   const following = useNotificationFeed('following');
   const feed = tab === 'all' ? all : following;
   const list = useRef<FlatList<Row>>(null);
-  const [refreshing, setRefreshing] = useState(false);
   const unread = all.data?.pages[0]?.unread ?? 0;
 
-  const refresh = async () => {
-    haptic.light();
-    setRefreshing(true);
-    await Promise.all([all.refetch(), following.refetch()]);
-    setRefreshing(false);
-  };
+  const { refreshing, onRefresh: refresh } = usePullRefresh(() => Promise.all([all.refetch(), following.refetch()]));
   useTabReselect(() => {
     list.current?.scrollToOffset({ offset: 0, animated: true });
     refresh();

@@ -12,6 +12,7 @@ import { useCollapsingHeader } from '@/hooks/useCollapsingHeader';
 import { useTabReselect } from '@/hooks/useTabReselect';
 import { useCampaigns, useInfiniteCampaigns } from '@/lib/queries';
 import { radius, space, useTheme } from '@/theme';
+import { usePullRefresh } from '@/hooks/usePullRefresh';
 
 const STEPS: { who: string; title: string; body: string }[] = [
   { who: 'Creator', title: 'Create', body: 'Write the message and pick who it should reach.' },
@@ -24,16 +25,10 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const featured = useCampaigns({ featured: true, status: 'all', sort: 'trending' });
   const feed = useInfiniteCampaigns({ status: 'all', sort: 'trending' });
-  const [refreshing, setRefreshing] = useState(false);
 
   const list = useRef<FlatList>(null);
   const header = useCollapsingHeader();
-  const refresh = async () => {
-    haptic.light();
-    setRefreshing(true);
-    await Promise.all([feed.refetch(), featured.refetch()]);
-    setRefreshing(false);
-  };
+  const { refreshing, onRefresh: refresh } = usePullRefresh(() => Promise.all([feed.refetch(), featured.refetch()]));
   const padTop = insets.top + header.height;
   useTabReselect(() => {
     list.current?.scrollToOffset({ offset: 0, animated: true });

@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { type ReactNode } from 'react';
-import { ScrollView, View, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Keyboard, Platform, ScrollView, View, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { space, useTheme } from '@/theme';
 import { IconButton, T } from './ui';
@@ -53,11 +53,28 @@ export function Body({ children, style, footer, ...rest }: ScrollViewProps & { c
 }
 
 /** Sticky action area at the bottom of a screen. Keeps the next action in thumb reach. */
+/** True while the software keyboard is on screen. */
+function useKeyboardOpen() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const ios = Platform.OS === 'ios';
+    const show = Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', () => setOpen(true));
+    const hide = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return open;
+}
+
 export function Footer({ children }: { children: ReactNode }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  // The keyboard covers the home-indicator area, so drop that inset and sit flush on top of it.
+  const keyboardOpen = useKeyboardOpen();
   return (
-    <View style={{ paddingHorizontal: space.xl, paddingTop: space.md, paddingBottom: Math.max(insets.bottom, space.md), backgroundColor: c.bg, borderTopWidth: 1, borderTopColor: c.border, gap: space.sm }}>
+    <View style={{ paddingHorizontal: space.xl, paddingTop: space.md, paddingBottom: keyboardOpen ? space.sm : Math.max(insets.bottom, space.md), backgroundColor: c.bg, borderTopWidth: 1, borderTopColor: c.border, gap: space.sm }}>
       {children}
     </View>
   );

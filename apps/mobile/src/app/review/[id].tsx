@@ -16,6 +16,7 @@ import { invalidateCampaign, useReviewDetail } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { radius, space, useTheme } from '@/theme';
+import { usePullRefresh } from '@/hooks/usePullRefresh';
 
 type Decision = 'approve' | 'request_changes' | 'reject';
 
@@ -24,6 +25,7 @@ export default function ReviewCampaign() {
   const { c } = useTheme();
   const user = useSession((s) => s.user);
   const q = useReviewDetail(id);
+  const pull = usePullRefresh(q.refetch);
   const [decision, setDecision] = useState<Decision | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -86,7 +88,7 @@ export default function ReviewCampaign() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title="Review campaign" subtitle={STATUS_META[d.status].label} />
-      <Body refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => { q.refetch(); }} tintColor={c.spinner} colors={[c.spinner]} />}>
+      <Body refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}>
         <View style={{ gap: space.sm }}>
           <StatusPill status={d.status} />
           <T variant="title">{d.title || 'Untitled'}</T>

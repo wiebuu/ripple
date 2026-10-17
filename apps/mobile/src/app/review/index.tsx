@@ -9,6 +9,7 @@ import { relTime } from '@/lib/format';
 import { useReviewQueue, type ReviewItem } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { space, useTheme } from '@/theme';
+import { usePullRefresh } from '@/hooks/usePullRefresh';
 
 const GROUPS: { key: string; label: string; match: (x: ReviewItem) => boolean }[] = [
   { key: 'review', label: 'Needs review', match: (x) => x.status === 'SUBMITTED' || x.hasPendingRevision },
@@ -24,6 +25,7 @@ export default function ReviewQueue() {
   const { c } = useTheme();
   const user = useSession((s) => s.user);
   const q = useReviewQueue();
+  const pull = usePullRefresh(q.refetch);
   const [tab, setTab] = useState('review');
 
   if (user?.role !== 'REVIEWER')
@@ -52,7 +54,7 @@ export default function ReviewQueue() {
         data={rows}
         keyExtractor={(x) => x.id}
         contentContainerStyle={{ padding: space.xl, paddingTop: space.sm, gap: space.md }}
-        refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => { q.refetch(); }} tintColor={c.spinner} colors={[c.spinner]} />}
+        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}
         renderItem={({ item }) => (
           <CampaignRow
             c={item}

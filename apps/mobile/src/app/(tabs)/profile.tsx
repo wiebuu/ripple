@@ -10,6 +10,7 @@ import { useBacked, useFollowing, useMyCampaigns, useSaved } from '@/lib/queries
 import { useSession } from '@/lib/session';
 import { radius, space, useTheme } from '@/theme';
 import { TigerPattern } from '@/components/brand/TigerPattern';
+import { usePullRefresh } from '@/hooks/usePullRefresh';
 
 export default function Profile() {
   const { c } = useTheme();
@@ -20,13 +21,8 @@ export default function Profile() {
   const saved = useSaved();
   const following = useFollowing();
   const scroll = useRef<ScrollView>(null);
-  const refresh = () => {
-    haptic.light();
-    mine.refetch();
-    backed.refetch();
-    saved.refetch();
-    following.refetch();
-  };
+  const pull = usePullRefresh(() => Promise.all([mine.refetch(), backed.refetch(), saved.refetch(), following.refetch()]));
+  const refresh = pull.onRefresh;
   useTabReselect(() => {
     scroll.current?.scrollTo({ y: 0, animated: true });
     refresh();
@@ -43,7 +39,7 @@ export default function Profile() {
       ref={scroll}
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: space.xl, paddingTop: 0, gap: space.xl, paddingBottom: space.huge }}
-      refreshControl={<RefreshControl refreshing={mine.isRefetching} onRefresh={refresh} tintColor={c.spinner} colors={[c.spinner]} />}>
+      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={refresh} tintColor={c.spinner} colors={[c.spinner]} />}>
       <TabHeader title="Profile" flush>
         <IconButton icon="ellipsis-horizontal" label="Menu: activity, settings, help and sign out" onPress={() => router.push('/menu')} style={{ marginRight: -space.sm }} />
       </TabHeader>

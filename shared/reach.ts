@@ -3,23 +3,35 @@
  * estimate in the UI. Actual reach depends on ad inventory, prices, targeting,
  * delivery and performance.
  */
+/**
+ * Most a single Razorpay payment may charge. Razorpay rejected ₹5,00,000 on this account
+ * ("Amount exceeds maximum amount allowed"), and UPI caps payments at ₹1,00,000, so we use that.
+ * Raise it to match Dashboard → Account & Settings → Transaction limits if the account allows more.
+ * The backer is charged contribution + processing, so that total must fit.
+ */
+const RAZORPAY_MAX_PAYMENT = 100000;
+const PROCESSING_RATE = 0.02;
+
 export const REACH_CONFIG = {
   /** Share of each contribution kept by the platform for review, setup and reporting. */
   platformFeeRate: 0.08,
   /** Payment processing fee (Razorpay standard rate), paid on top by the backer. */
-  processingRate: 0.02,
+  processingRate: PROCESSING_RATE,
   processingFixed: 0,
   /** Assumed people reached per advertising rupee (blended CPM across channels). */
   peoplePerAdRupee: 0.35,
   /** Contribution limits in rupees. */
   minContribution: 50,
-  maxContribution: 500000,
+  /** Largest contribution whose total charge (with processing) stays within Razorpay's per-payment cap. */
+  maxContribution: Math.floor(RAZORPAY_MAX_PAYMENT / (1 + PROCESSING_RATE)),
   presets: [100, 250, 500, 1000, 2500],
 } as const;
 
 /** All money in Ripple is in Indian rupees; payments are processed by Razorpay (test mode). */
 export const PAYMENT_CONFIG = {
   currency: 'INR',
+  /** Most Razorpay accepts in a single payment (default account limit). */
+  maxPayment: RAZORPAY_MAX_PAYMENT,
   /** Typical per-payment UPI limit. Larger payments should use a card. */
   upiLimit: 100000,
 } as const;
@@ -36,6 +48,27 @@ export const CHANNELS = [
   { key: 'news', label: 'News & publisher sites', factor: 0.9, note: 'Display ads on partner publishers' },
   { key: 'video', label: 'Online video', factor: 0.7, note: 'Pre-roll on video platforms' },
 ] as const;
+
+/** Apps and ad networks a creator can ask to run on, grouped by who sells the inventory. */
+export const PLATFORMS = [
+  { key: 'facebook', label: 'Facebook', network: 'Meta' },
+  { key: 'instagram', label: 'Instagram', network: 'Meta' },
+  { key: 'google_search', label: 'Google Search', network: 'Google' },
+  { key: 'youtube', label: 'YouTube', network: 'Google' },
+  { key: 'google_display', label: 'Display Network', network: 'Google' },
+  { key: 'tiktok', label: 'TikTok', network: 'More' },
+  { key: 'snapchat', label: 'Snapchat', network: 'More' },
+  { key: 'x', label: 'X', network: 'More' },
+  { key: 'linkedin', label: 'LinkedIn', network: 'More' },
+  { key: 'reddit', label: 'Reddit', network: 'More' },
+  { key: 'pinterest', label: 'Pinterest', network: 'More' },
+] as const;
+
+export type PlatformKey = (typeof PLATFORMS)[number]['key'];
+
+/** Choices for how long a campaign stays open for backing. */
+export const FUNDING_DAY_OPTIONS = [7, 14, 21, 30, 45, 60] as const;
+export const DEFAULT_FUNDING_DAYS = 30;
 
 export type ChannelKey = (typeof CHANNELS)[number]['key'];
 

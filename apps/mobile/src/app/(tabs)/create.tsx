@@ -14,6 +14,7 @@ import { useMyCampaigns } from '@/lib/queries';
 import { toast } from '@/lib/toast';
 import { TigerPattern } from '@/components/brand/TigerPattern';
 import { radius, space, useTheme } from '@/theme';
+import { usePullRefresh } from '@/hooks/usePullRefresh';
 
 /**
  * The two ways to start are a matched pair: `pattern` is the surface card with
@@ -58,6 +59,7 @@ export default function CreateTab() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const mine = useMyCampaigns();
+  const pull = usePullRefresh(mine.refetch);
   const [busy, setBusy] = useState(false);
   const scroll = useRef<ScrollView>(null);
   useTabReselect(() => {
@@ -84,7 +86,7 @@ export default function CreateTab() {
       ref={scroll}
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: space.xl, paddingTop: 0, gap: space.xl, paddingBottom: space.huge }}
-      refreshControl={<RefreshControl refreshing={mine.isRefetching} onRefresh={() => { haptic.light(); mine.refetch(); }} tintColor={c.spinner} colors={[c.spinner]} />}>
+      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}>
       <View>
         <TabHeader title="Start a campaign" flush />
         <T color="textMuted">Share a message you want more people to see. We review it, backers fund the reach, and you get a report of who it reached.</T>

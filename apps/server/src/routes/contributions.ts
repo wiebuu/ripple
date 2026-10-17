@@ -51,6 +51,7 @@ contributions.post(
     if (err) throw new HttpError(400, err);
 
     const fees = feeBreakdown(body.amount);
+    if (fees.total > PAYMENT_CONFIG.maxPayment) throw new HttpError(400, `A single payment can't exceed ${formatMoney(PAYMENT_CONFIG.maxPayment)} including processing.`);
     const k = await db.contribution.create({
       data: {
         campaignId: c.id,

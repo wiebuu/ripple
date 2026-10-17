@@ -51,6 +51,16 @@ import { FloppyDiskIcon } from 'phosphor-react-native/src/icons/FloppyDisk';
 import { FolderOpenIcon } from 'phosphor-react-native/src/icons/FolderOpen';
 import { GearSixIcon } from 'phosphor-react-native/src/icons/GearSix';
 import { GitCommitIcon } from 'phosphor-react-native/src/icons/GitCommit';
+import { FacebookLogoIcon } from 'phosphor-react-native/src/icons/FacebookLogo';
+import { InstagramLogoIcon } from 'phosphor-react-native/src/icons/InstagramLogo';
+import { YoutubeLogoIcon } from 'phosphor-react-native/src/icons/YoutubeLogo';
+import { TiktokLogoIcon } from 'phosphor-react-native/src/icons/TiktokLogo';
+import { SnapchatLogoIcon } from 'phosphor-react-native/src/icons/SnapchatLogo';
+import { XLogoIcon } from 'phosphor-react-native/src/icons/XLogo';
+import { LinkedinLogoIcon } from 'phosphor-react-native/src/icons/LinkedinLogo';
+import { RedditLogoIcon } from 'phosphor-react-native/src/icons/RedditLogo';
+import { PinterestLogoIcon } from 'phosphor-react-native/src/icons/PinterestLogo';
+import { MetaLogoIcon } from 'phosphor-react-native/src/icons/MetaLogo';
 import { GoogleLogoIcon } from 'phosphor-react-native/src/icons/GoogleLogo';
 import { HandHeartIcon } from 'phosphor-react-native/src/icons/HandHeart';
 import { HeartIcon } from 'phosphor-react-native/src/icons/Heart';
@@ -180,6 +190,16 @@ export const ICONS = {
   'log-in-outline': [SignInIcon, 'regular'],
   'log-out-outline': [SignOutIcon, 'regular'],
   'logo-google': [GoogleLogoIcon, 'bold'],
+  'logo-facebook': [FacebookLogoIcon, 'fill'],
+  'logo-instagram': [InstagramLogoIcon, 'fill'],
+  'logo-youtube': [YoutubeLogoIcon, 'fill'],
+  'logo-tiktok': [TiktokLogoIcon, 'fill'],
+  'logo-snapchat': [SnapchatLogoIcon, 'fill'],
+  'logo-x': [XLogoIcon, 'fill'],
+  'logo-linkedin': [LinkedinLogoIcon, 'fill'],
+  'logo-reddit': [RedditLogoIcon, 'fill'],
+  'logo-pinterest': [PinterestLogoIcon, 'fill'],
+  'logo-meta': [MetaLogoIcon, 'fill'],
   'mail-outline': [EnvelopeSimpleIcon, 'regular'],
   'megaphone-outline': [HandHeartIcon, 'regular'],
   'megaphone': [HandHeartIcon, 'fill'],

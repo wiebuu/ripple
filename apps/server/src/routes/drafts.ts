@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { CATEGORIES, CHANNELS, CREATOR_TYPES, validateAll, firstInvalidStep, STEPS, type DraftContent } from '../../../../shared';
+import { CATEGORIES, CHANNELS, CREATOR_TYPES, PLATFORMS, validateAll, firstInvalidStep, STEPS, type DraftContent } from '../../../../shared';
 import { requireAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import { ah, forbidden, HttpError, notFound } from '../lib/http';
@@ -53,9 +53,11 @@ const DraftSchema = z.object({
     ageRange: z.tuple([z.number().int().min(13).max(100), z.number().int().min(13).max(100)]),
     interests: z.array(str(60)).max(20),
     channels: z.partialRecord(z.enum(CHANNELS.map((c) => c.key) as [string, ...string[]]), z.number().min(0).max(100)),
+    platforms: z.array(z.enum(PLATFORMS.map((p) => p.key) as [string, ...string[]])).max(PLATFORMS.length).optional(),
     durationDays: z.number().int().min(1).max(365),
   }),
   goal: z.number().min(0).max(1_000_000).nullable(),
+  fundingDays: z.number().int().min(7).max(60).optional(),
   acceptedRules: z.boolean(),
 });
 

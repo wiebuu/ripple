@@ -11,17 +11,20 @@ import { Banner, Button, Card, Divider, ErrorState, Icon, IconButton, Pill, Prog
 import { api, errorMessage } from '@/lib/api';
 import { openEditor } from '@/lib/create';
 import { useDrafts } from '@/lib/draft';
-import { formatMoney, formatReach, pct, relTime, shortDate, timeLeft } from '@/lib/format';
+import { formatMoney, formatReach, pct, relTime, shortDate } from '@/lib/format';
+import { Countdown } from '@/components/campaign';
 import { invalidateCampaign, useCampaign, type Detail } from '@/lib/queries';
 import { useBackOrPush } from '@/lib/nav';
 import { shareCampaign } from '@/lib/share';
 import { toast } from '@/lib/toast';
 import { radius, space, useTheme } from '@/theme';
+import { usePullRefresh } from '@/hooks/usePullRefresh';
 
 export default function Manage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { c } = useTheme();
   const q = useCampaign(id);
+  const pull = usePullRefresh(q.refetch);
 
   if (q.isPending)
     return (
@@ -48,7 +51,7 @@ export default function Manage() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title="Manage campaign" right={isPublic ? <IconButton icon="share-outline" label="Share campaign" onPress={() => shareCampaign(d)} /> : undefined} />
-      <Body refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => { q.refetch(); }} tintColor={c.spinner} colors={[c.spinner]} />}>
+      <Body refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}>
         <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'center' }}>
           {d.coverImage ? (
             <Image source={d.coverImage} style={{ width: 72, height: 72, borderRadius: radius.md }} contentFit="cover" />
@@ -288,9 +291,13 @@ function Analytics({ d }: { d: Detail }) {
           <T variant="small" color="textMuted">
             {p}% funded
           </T>
-          <T variant="small" color="textMuted">
-            {d.status === 'FUNDING' ? `${timeLeft(d.endsAt)} · ends ${shortDate(d.endsAt)}` : 'Funding closed'}
-          </T>
+          {d.status === 'FUNDING' ? (
+            <Countdown endsAt={d.endsAt} />
+          ) : (
+            <T variant="small" color="textMuted">
+              Funding closed
+            </T>
+          )}
         </View>
         <View style={{ flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' }}>
           {[25, 50, 75, 100].map((m) => (

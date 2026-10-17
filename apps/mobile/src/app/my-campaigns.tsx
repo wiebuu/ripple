@@ -8,6 +8,7 @@ import { Button, Chip, EmptyState, ErrorState, IconButton } from '@/components/u
 import { formatReach, relTime, timeLeft } from '@/lib/format';
 import { useMyCampaigns, type MyCampaign } from '@/lib/queries';
 import { space, useTheme } from '@/theme';
+import { usePullRefresh } from '@/hooks/usePullRefresh';
 
 /** Creator dashboard: every campaign by lifecycle stage. */
 export default function MyCampaigns() {
@@ -15,6 +16,7 @@ export default function MyCampaigns() {
   const params = useLocalSearchParams<{ tab?: string }>();
   const [tab, setTab] = useState(params.tab ?? 'drafts');
   const q = useMyCampaigns();
+  const pull = usePullRefresh(q.refetch);
   const items = q.data?.items ?? [];
   const current = DASHBOARD_TABS.find((t) => t.key === tab) ?? DASHBOARD_TABS[0];
   const rows = items.filter((x) => current.statuses.includes(x.status));
@@ -40,7 +42,7 @@ export default function MyCampaigns() {
         data={rows}
         keyExtractor={(x) => x.id}
         contentContainerStyle={{ padding: space.xl, paddingTop: space.sm, gap: space.md }}
-        refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => { q.refetch(); }} tintColor={c.spinner} colors={[c.spinner]} />}
+        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}
         renderItem={({ item }) => <CampaignRow c={item} meta={meta(item)} onPress={() => router.push({ pathname: '/manage/[id]', params: { id: item.id } })} />}
         ListEmptyComponent={
           q.isPending ? (

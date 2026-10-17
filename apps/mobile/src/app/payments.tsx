@@ -6,6 +6,7 @@ import { EmptyState, ErrorState, Icon, Pill, Skeleton, T } from '@/components/ui
 import { formatMoney, shortDate } from '@/lib/format';
 import { useMyContributions } from '@/lib/queries';
 import { radius, space, useTheme } from '@/theme';
+import { usePullRefresh } from '@/hooks/usePullRefresh';
 
 const TONE = { SUCCEEDED: 'success', PENDING: 'warning', FAILED: 'danger', CANCELLED: 'neutral', REFUNDED: 'info' } as const;
 const LABEL = { SUCCEEDED: 'Paid', PENDING: 'Pending', FAILED: 'Failed', CANCELLED: 'Cancelled', REFUNDED: 'Refunded' } as const;
@@ -13,6 +14,7 @@ const LABEL = { SUCCEEDED: 'Paid', PENDING: 'Pending', FAILED: 'Failed', CANCELL
 export default function Payments() {
   const { c } = useTheme();
   const q = useMyContributions();
+  const pull = usePullRefresh(q.refetch);
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title="Payment history" />
@@ -22,7 +24,7 @@ export default function Payments() {
         contentContainerStyle={{ padding: space.xl, gap: space.sm }}
         onEndReached={q.loadMore}
         onEndReachedThreshold={0.5}
-        refreshControl={<RefreshControl refreshing={q.isRefetching && !q.isFetchingNextPage} onRefresh={() => { q.refetch(); }} tintColor={c.spinner} colors={[c.spinner]} />}
+        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}
         renderItem={({ item }) => <PaymentRow k={item} />}
         ListHeaderComponent={
           q.items.length ? (

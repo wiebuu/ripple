@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Pressable, TextInput, View } from 'react-native';
-import { CHANNELS, GOAL_MAX, GOAL_MIN, REACH_CONFIG, STEP_VALIDATORS, STEPS, channelFactor, estimateReach, feeBreakdown } from '@shared';
+import { CHANNELS, DEFAULT_FUNDING_DAYS, PLATFORMS, GOAL_MAX, GOAL_MIN, REACH_CONFIG, STEP_VALIDATORS, STEPS, channelFactor, estimateReach, feeBreakdown } from '@shared';
 import { formatMoney, formatReach } from '@/lib/format';
 import { fonts, radius, space, useTheme } from '@/theme';
 import { Banner, Card, Divider, Icon, T } from '../ui';
@@ -18,7 +18,6 @@ export function SubmitStep({ d, update, errors, onJump }: StepProps & { onJump: 
   const factor = channelFactor(d.reach.channels);
   const goal = d.goal ?? 0;
   const f = feeBreakdown(goal);
-  const total = Object.values(d.reach.channels).reduce((a, b) => a + (b ?? 0), 0) || 1;
   const stepIssues = STEP_VALIDATORS.slice(0, 4).map((fn) => Object.values(fn(d)));
   const cover = d.visuals.coverImage || d.basics.coverImage;
 
@@ -61,13 +60,18 @@ export function SubmitStep({ d, update, errors, onJump }: StepProps & { onJump: 
         <T variant="small">
           Adults {d.reach.ageRange[0]}–{d.reach.ageRange[1]} in {d.reach.locations.join(', ') || '—'}
         </T>
-        <T variant="small" color="textMuted">
-          {CHANNELS.filter((ch) => d.reach.channels[ch.key])
-            .map((ch) => `${ch.label} ${Math.round(((d.reach.channels[ch.key] ?? 0) / total) * 100)}%`)
-            .join(' · ') || 'No channels'}
+        <T variant="small">
+          On {PLATFORMS.filter((p) => d.reach.platforms?.includes(p.key))
+            .map((p) => p.label)
+            .join(', ') || 'no apps yet'}
         </T>
         <T variant="small" color="textMuted">
-          Ads run for {d.reach.durationDays} days after funding closes
+          {CHANNELS.filter((ch) => d.reach.channels[ch.key])
+            .map((ch) => ch.label)
+            .join(' · ') || 'No placements'}
+        </T>
+        <T variant="small" color="textMuted">
+          Live for {d.fundingDays ?? DEFAULT_FUNDING_DAYS} days · ads run for {d.reach.durationDays} days after funding closes
         </T>
       </Section>
 
@@ -104,7 +108,7 @@ export function SubmitStep({ d, update, errors, onJump }: StepProps & { onJump: 
           <Divider />
           <Row k="Spent on advertising" v={formatMoney(f.adBudget)} />
           <Row k={`Platform share (${Math.round(REACH_CONFIG.platformFeeRate * 100)}%) for review, setup, reporting`} v={formatMoney(f.platformFee)} />
-          <Row k="Funding window" v="30 days after approval" />
+          <Row k="Campaign live for" v={`${d.fundingDays ?? DEFAULT_FUNDING_DAYS} days after approval`} />
           <Row k="Ad flight" v={`${d.reach.durationDays} days`} />
           <T variant="small" color="textMuted">
             Backers pay card processing on top. Funds are held by the platform and spent only on approved ads; they are never paid to you. If the goal isn’t met, the team runs a

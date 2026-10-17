@@ -1,5 +1,5 @@
 import type { CampaignStatus } from './lifecycle';
-import type { ChannelKey } from './reach';
+import type { ChannelKey, PlatformKey } from './reach';
 
 export const CATEGORIES = [
   'Environment',
@@ -49,6 +49,8 @@ export type ReachSettings = {
   ageRange: [number, number];
   interests: string[];
   channels: Partial<Record<ChannelKey, number>>;
+  /** Apps the ads should run on. Older drafts omit it. */
+  platforms?: PlatformKey[];
   durationDays: number;
 };
 
@@ -67,6 +69,8 @@ export type DraftContent = {
   visuals: Visuals;
   reach: ReachSettings;
   goal: number | null;
+  /** How long the campaign stays open for backing once approved. Older drafts omit it (30 days). */
+  fundingDays?: number;
   acceptedRules: boolean;
 };
 
@@ -223,7 +227,8 @@ export const emptyDraft = (creatorName = ''): DraftContent => ({
   basics: { title: '', category: '', creatorName, creatorType: 'Individual', summary: '' },
   story: { headline: '', intro: '', blocks: [], sources: [], actions: [] },
   visuals: { adImages: [], adHeadline: '', adDescription: '', ctaText: 'Learn more' },
-  reach: { locations: [], ageRange: [18, 65], interests: [], channels: { social_feed: 60, news: 40 }, durationDays: 30 },
+  reach: { locations: [], ageRange: [18, 65], interests: [], channels: { social_feed: 60, news: 40 }, platforms: ['facebook', 'instagram', 'google_search', 'youtube'], durationDays: 30 },
   goal: null,
+  fundingDays: 30,
   acceptedRules: false,
 });

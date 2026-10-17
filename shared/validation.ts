@@ -3,7 +3,7 @@
  * (authoritative check on submit). Returns a map of field path -> message.
  */
 import { CATEGORIES, type DraftContent } from './types';
-import { REACH_CONFIG, formatMoney } from './reach';
+import { FUNDING_DAY_OPTIONS, REACH_CONFIG, formatMoney } from './reach';
 
 export type Errors = Record<string, string>;
 
@@ -67,9 +67,11 @@ export function validateReach(d: DraftContent): Errors {
   const r = d.reach;
   if (r.locations.length === 0) e['reach.locations'] = 'Choose at least one location.';
   const total = Object.values(r.channels).reduce((a, b) => a + (b ?? 0), 0);
-  if (total === 0) e['reach.channels'] = 'Choose at least one distribution channel.';
+  if (!r.platforms?.length) e['reach.platforms'] = 'Choose at least one app for your ads.';
+  if (total === 0) e['reach.channels'] = 'Choose at least one ad format.';
   if (r.durationDays < 7 || r.durationDays > 90) e['reach.durationDays'] = 'Duration must be between 7 and 90 days.';
   if (r.ageRange[0] < 18) e['reach.ageRange'] = 'Advertising audiences must be 18 or older.';
+  if (d.fundingDays != null && !(FUNDING_DAY_OPTIONS as readonly number[]).includes(d.fundingDays)) e['fundingDays'] = 'Choose how long the campaign stays live.';
   return e;
 }
 

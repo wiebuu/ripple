@@ -7,12 +7,14 @@ import { Banner, Card, DemoBadge, Divider, EmptyState, ErrorState, Pill, Skeleto
 import { formatMoney, formatReach, shortDate } from '@/lib/format';
 import { useReport } from '@/lib/queries';
 import { space, useTheme } from '@/theme';
+import { usePullRefresh } from '@/hooks/usePullRefresh';
 
 /** Distribution report. Money, measured delivery and the original estimate are kept visibly separate. */
 export default function Report() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { c } = useTheme();
   const q = useReport(id);
+  const pull = usePullRefresh(q.refetch);
 
   if (q.isPending)
     return (
@@ -49,7 +51,7 @@ export default function Report() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title={r.final ? 'Final report' : 'Distribution report'} subtitle={cp.title} />
-      <Body refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => { q.refetch(); }} tintColor={c.spinner} colors={[c.spinner]} />}>
+      <Body refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}>
         <View style={{ flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' }}>
           <Pill label={r.final ? 'Final' : 'In progress'} tone={r.final ? 'success' : 'info'} />
           {cp.isDemo && <DemoBadge />}

@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { BACKABLE_STATUSES, REACH_CONFIG, STATUS_META, feeBreakdown, peoplePerHundred, type CampaignSummary } from '@shared';
 import { formatMoney, formatReach, pct, relTime, timeLeft } from '@/lib/format';
@@ -95,13 +95,47 @@ export function Funding({ c: campaign, compact }: { c: CampaignSummary; compact?
           <T variant="small" color="textMuted">
             {campaign.backerCount.toLocaleString('en-US')} backers
           </T>
-          {!!left && (
-            <T variant="small" color="textMuted">
-              {left}
-            </T>
-          )}
+          {!!left && <Countdown endsAt={campaign.endsAt} />}
         </View>
       )}
+    </View>
+  );
+}
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** Live "ends in" timer that ticks every second until the campaign closes. */
+export function Countdown({ endsAt }: { endsAt: string | null }) {
+  const { c } = useTheme();
+  const [now, setNow] = useState(Date.now);
+  const ms = endsAt ? new Date(endsAt).getTime() - now : 0;
+  const live = ms > 0;
+  useEffect(() => {
+    if (!live) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [live]);
+  if (!endsAt) return null;
+  if (ms <= 0) {
+    return (
+      <T variant="small" color="textMuted">
+        Ended
+      </T>
+    );
+  }
+  const s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400);
+  const text = `${d ? `${d}d ` : ''}${pad(Math.floor((s % 86400) / 3600))}h ${pad(Math.floor((s % 3600) / 60))}m ${pad(s % 60)}s`;
+  const urgent = ms < 864e5;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} accessibilityLabel={`Ends in ${timeLeft(endsAt)?.replace(' left', '')}`}>
+      <Icon name="time-outline" size={13} color={urgent ? c.warning : c.textMuted} />
+      <T variant="small" color="textMuted">
+        Ends in{' '}
+        <T variant="smallStrong" style={{ color: urgent ? c.warning : c.text, fontVariant: ['tabular-nums'] }}>
+          {text}
+        </T>
+      </T>
     </View>
   );
 }

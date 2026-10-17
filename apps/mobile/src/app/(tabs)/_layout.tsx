@@ -22,10 +22,13 @@ function CreateButton({ onPress, accessibilityState }: { onPress?: (e: any) => v
         onPress={onPress}
         hitSlop={6}
         style={({ pressed }) => [
-          { width: 58, height: 58, borderRadius: 29, marginTop: -18, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: c.surface, transform: [{ scale: pressed ? 0.94 : 1 }] },
+          // Ring is a surface-coloured outer circle rather than a border, so the fill can't bleed past its edge.
+          { width: 58, height: 58, borderRadius: 29, marginTop: -18, padding: 4, backgroundColor: c.surface, transform: [{ scale: pressed ? 0.94 : 1 }] },
           shadow.card,
         ]}>
-        <Icon name="add" size={30} color={c.onPrimary} />
+        <View style={{ flex: 1, borderRadius: 25, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="add" size={30} color={c.onPrimary} />
+        </View>
       </Pressable>
     </View>
   );

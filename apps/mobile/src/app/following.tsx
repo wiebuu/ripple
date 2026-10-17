@@ -8,11 +8,13 @@ import { pct, timeLeft } from '@/lib/format';
 import { useFollowCampaign, useFollowing } from '@/lib/queries';
 import { toast } from '@/lib/toast';
 import { space, useTheme } from '@/theme';
+import { usePullRefresh } from '@/hooks/usePullRefresh';
 
 /** Campaigns the user follows. Their updates appear in Activity → Following. */
 export default function Following() {
   const { c } = useTheme();
   const q = useFollowing();
+  const pull = usePullRefresh(q.refetch);
   const follow = useFollowCampaign();
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -21,7 +23,7 @@ export default function Following() {
         data={q.data?.items ?? []}
         keyExtractor={(x) => x.id}
         contentContainerStyle={{ padding: space.xl, gap: space.md }}
-        refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => { q.refetch(); }} tintColor={c.spinner} colors={[c.spinner]} />}
+        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}
         renderItem={({ item }) => (
           <CampaignRow
             c={item}

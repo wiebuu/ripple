@@ -1,12 +1,10 @@
 import type { Campaign, Prisma } from '@prisma/client';
-import { canTransition, CHANNELS, feeBreakdown, STATUS_META, type CampaignStatus, type ChannelKey } from '../../../../shared';
+import { canTransition, CHANNELS, DEFAULT_FUNDING_DAYS, feeBreakdown, STATUS_META, type CampaignStatus, type ChannelKey } from '../../../../shared';
 import type { AuthUser } from './auth';
 import { db } from './db';
 import { HttpError } from './http';
 import { audienceOf, notify, notifyMany } from './notify';
 import { contentOf } from './serialize';
-
-export const FUNDING_WINDOW_DAYS = 30;
 
 type Actor = Pick<AuthUser, 'id' | 'name'> | null;
 
@@ -43,7 +41,7 @@ export async function transition(
   if (to === 'SUBMITTED') data.submittedAt = now;
   if (to === 'FUNDING') {
     data.publishedAt = now;
-    data.endsAt = new Date(now.getTime() + FUNDING_WINDOW_DAYS * 864e5);
+    data.endsAt = new Date(now.getTime() + (contentOf(c).fundingDays ?? DEFAULT_FUNDING_DAYS) * 864e5);
   }
 
   const updated = await db.$transaction(async (tx) => {

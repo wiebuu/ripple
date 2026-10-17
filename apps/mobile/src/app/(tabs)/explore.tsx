@@ -11,6 +11,7 @@ import { useCollapsingHeader } from '@/hooks/useCollapsingHeader';
 import { useTabReselect } from '@/hooks/useTabReselect';
 import { useCampaigns, useInfiniteCampaigns, type ListParams } from '@/lib/queries';
 import { fonts, radius, space, useTheme } from '@/theme';
+import { usePullRefresh } from '@/hooks/usePullRefresh';
 
 const SORTS: { key: NonNullable<ListParams['sort']>; label: string }[] = [
   { key: 'trending', label: 'Trending' },
@@ -41,6 +42,11 @@ export default function Explore() {
   const params = useLocalSearchParams<{ category?: string; focus?: string }>();
   const searchRef = useRef<TextInput>(null);
   const [q, setQ] = useState('');
+  const [searchOpen, setSearchOpen] = useState(!!params.focus);
+  const closeSearch = () => {
+    setQ('');
+    setSearchOpen(false);
+  };
   const [category, setCategory] = useState<string | undefined>(params.category);
   const [sort, setSort] = useState<NonNullable<ListParams['sort']>>('trending');
   const [status, setStatus] = useState<NonNullable<ListParams['status']>>('all');
@@ -54,6 +60,12 @@ export default function Explore() {
   if (params.category !== lastParam) {
     setLastParam(params.category);
     if (params.category) setCategory(params.category);
+  }
+  // "Search" links from other screens open the search bar.
+  const [lastFocus, setLastFocus] = useState(params.focus);
+  if (params.focus !== lastFocus) {
+    setLastFocus(params.focus);
+    if (params.focus) setSearchOpen(true);
   }
 
   const query = useInfiniteCampaigns({ q: dq || undefined, category, sort, status, creatorType, minPct });
@@ -70,13 +82,7 @@ export default function Explore() {
     setMinPct(undefined);
   };
   const sortLabel = useMemo(() => SORTS.find((s) => s.key === sort)!.label, [sort]);
-  const [refreshing, setRefreshing] = useState(false);
-  const refresh = async () => {
-    haptic.light();
-    setRefreshing(true);
-    await Promise.all([query.refetch(), featured.refetch()]);
-    setRefreshing(false);
-  };
+  const { refreshing, onRefresh: refresh } = usePullRefresh(() => Promise.all([query.refetch(), featured.refetch()]));
   const list = useRef<FlatList>(null);
   const header = useCollapsingHeader();
   const padTop = insets.top + header.height;
@@ -105,6 +111,7 @@ export default function Explore() {
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: c.bg, zIndex: 20 }} />
       <Animated.View onLayout={header.onLayout} style={[header.headerStyle, { top: insets.top, backgroundColor: c.bg }]}>
         <TabHeader title="Explore">
+          <IconButton icon={searchOpen ? 'close' : 'search'} label={searchOpen ? 'Close search' : 'Search'} onPress={() => (searchOpen ? closeSearch() : setSearchOpen(true))} />
           <View>
             <IconButton icon="options-outline" label={filterCount ? `Filters, ${filterCount} on` : 'Filters'} onPress={() => setSheet(true)} />
             {filterCount > 0 && (
@@ -116,22 +123,25 @@ export default function Explore() {
             )}
           </View>
         </TabHeader>
-        <View style={{ paddingHorizontal: space.xl }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, height: 44, paddingHorizontal: space.lg, borderRadius: radius.pill, backgroundColor: c.surfaceAlt }}>
-            <Icon name="search" size={17} color={c.textMuted} />
-            <TextInput
-              ref={searchRef}
-              value={q}
-              onChangeText={setQ}
-              placeholder="Search causes, creators, places"
-              placeholderTextColor={c.textSubtle}
-              returnKeyType="search"
-              accessibilityLabel="Search campaigns"
-              style={{ flex: 1, fontFamily: fonts.sans, fontSize: 15, color: c.text }}
-            />
-            {!!q && <IconButton icon="close-circle" label="Clear search" size={17} onPress={() => setQ('')} style={{ marginRight: -space.sm }} />}
+        {searchOpen && (
+          <View style={{ paddingHorizontal: space.xl }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, height: 44, paddingHorizontal: space.lg, borderRadius: radius.pill, backgroundColor: c.surfaceAlt }}>
+              <Icon name="search" size={17} color={c.textMuted} />
+              <TextInput
+                ref={searchRef}
+                value={q}
+                onChangeText={setQ}
+                placeholder="Search causes, creators, places"
+                placeholderTextColor={c.textSubtle}
+                autoFocus
+                returnKeyType="search"
+                accessibilityLabel="Search campaigns"
+                style={{ flex: 1, fontFamily: fonts.sans, fontSize: 15, color: c.text }}
+              />
+              {!!q && <IconButton icon="close-circle" label="Clear search" size={17} onPress={() => setQ('')} style={{ marginRight: -space.sm }} />}
+            </View>
           </View>
-        </View>
+        )}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.xl, paddingTop: space.md, paddingBottom: space.sm, gap: 6 }}>
           <CategoryPill label="All" selected={!category} onPress={() => setCategory(undefined)} />
           {CATEGORIES.map((cat) => (
