@@ -305,66 +305,93 @@ export function SupporterStack({ count, names = [], cta = true }: { count: numbe
 }
 
 /** Compact row for lists (Explore results, profile lists). */
-export function CampaignRow({ c: campaign, right, onPress, meta }: { c: CampaignSummary; right?: React.ReactNode; onPress?: () => void; meta?: string }) {
+/** Thumbnail size shared by every campaign list row. */
+export const ROW_THUMB = 68;
+
+/**
+ * The one campaign list row used across the app (Following, My campaigns, Saved, Backed, drafts, review queue):
+ * no card, a rounded thumbnail, "category · creator", a two-line title, then progress or a status line.
+ * `right` is a separate tap target (e.g. a follow toggle), never nested in the row's own button.
+ * Pass `divider` for every row but the first; the hairline starts after the thumbnail.
+ */
+export function CampaignRow({ c: campaign, right, onPress, meta, divider }: { c: CampaignSummary; right?: React.ReactNode; onPress?: () => void; meta?: string; divider?: boolean }) {
+  const { c } = useTheme();
+  const isOpen = BACKABLE_STATUSES.includes(campaign.status);
+  const p = pct(campaign.raised, campaign.goal);
+  const left = isOpen ? timeLeft(campaign.endsAt) : null;
+  const byline = [campaign.category || 'No category', campaign.creatorName].filter(Boolean).join(' · ');
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+      {divider && <View style={{ position: 'absolute', top: 0, left: ROW_THUMB + space.md, right: 0, height: 1, backgroundColor: c.border }} />}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${campaign.title || 'Untitled draft'}. ${meta ?? (isOpen ? `${p} percent funded` : STATUS_META[campaign.status].label)}`}
+        onPress={onPress ?? (() => open(campaign))}
+        style={({ pressed }) => ({ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, opacity: pressed ? 0.6 : 1 })}>
+        {campaign.coverImage ? (
+          <Image source={campaign.coverImage} style={{ width: ROW_THUMB, height: ROW_THUMB, borderRadius: radius.md + 2, borderWidth: 1, borderColor: c.border, backgroundColor: c.skeleton }} contentFit="cover" transition={150} />
+        ) : (
+          <View style={{ width: ROW_THUMB, height: ROW_THUMB, borderRadius: radius.md + 2, backgroundColor: c.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="image-outline" size={22} color={c.textSubtle} />
+          </View>
+        )}
+        <View style={{ flex: 1, gap: 3 }}>
+          <T variant="small" color="textMuted" numberOfLines={1} style={{ fontSize: 12 }}>
+            {byline}
+          </T>
+          <T variant="bodyStrong" numberOfLines={2} style={{ fontSize: 15, lineHeight: 20 }}>
+            {campaign.title || 'Untitled draft'}
+          </T>
+          {meta ? (
+            <T variant="small" color="textMuted" numberOfLines={1} style={{ fontSize: 12 }}>
+              {meta}
+            </T>
+          ) : isOpen && campaign.goal > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: 2 }}>
+              <View style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: c.track, overflow: 'hidden' }}>
+                <View style={{ width: `${p}%`, height: 3, backgroundColor: p >= 100 ? c.success : c.primary }} />
+              </View>
+              <T variant="small" color="textMuted" style={{ fontSize: 12, fontVariant: ['tabular-nums'] }}>
+                {p}%{left ? ` · ${left}` : ''}
+              </T>
+            </View>
+          ) : (
+            <T variant="small" style={{ fontSize: 12, color: c.textSubtle }}>
+              {STATUS_META[campaign.status].label}
+            </T>
+          )}
+        </View>
+      </Pressable>
+      {right}
+    </View>
+  );
+}
+
+/** Icon-only follow toggle for list rows: a filled bell when following, an outlined bell when not. */
+export function FollowToggle({ following, title, onPress }: { following: boolean; title: string; onPress: () => void }) {
   const { c } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={campaign.title || 'Untitled draft'}
-      onPress={onPress ?? (() => open(campaign))}
+      accessibilityLabel={following ? `Unfollow ${title}` : `Follow ${title}`}
+      accessibilityState={{ selected: following }}
+      hitSlop={8}
+      onPress={() => {
+        haptic.light();
+        onPress();
+      }}
       style={({ pressed }) => ({
-        flexDirection: 'row',
-        gap: space.md,
-        padding: space.md,
-        backgroundColor: c.surface,
-        borderRadius: radius.lg,
-        borderWidth: 1,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: following ? c.primarySoft : 'transparent',
+        borderWidth: following ? 0 : 1,
         borderColor: c.border,
-        opacity: pressed ? 0.9 : 1,
+        opacity: pressed ? 0.6 : 1,
       })}>
-      {campaign.coverImage ? (
-        <Image
-          source={campaign.coverImage}
-          style={{
-            width: 84,
-            height: 84,
-            borderRadius: radius.md,
-            backgroundColor: c.skeleton,
-          }}
-          contentFit="cover"
-        />
-      ) : (
-        <View
-          style={{
-            width: 84,
-            height: 84,
-            borderRadius: radius.md,
-            backgroundColor: c.surfaceAlt,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-          <Icon name="image-outline" size={24} color={c.textSubtle} />
-        </View>
-      )}
-      <View style={{ flex: 1, gap: 6 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <T variant="overline" color="primary" numberOfLines={1} style={{ flexShrink: 1 }}>
-            {campaign.category || 'No category'}
-          </T>
-          {campaign.status !== 'FUNDING' && <StatusPill status={campaign.status} />}
-        </View>
-        <T variant="bodyStrong" numberOfLines={2}>
-          {campaign.title || 'Untitled draft'}
-        </T>
-        {meta ? (
-          <T variant="small" color="textMuted">
-            {meta}
-          </T>
-        ) : campaign.goal > 0 ? (
-          <Funding c={campaign} compact />
-        ) : null}
-      </View>
-      {right}
+      <Icon name={following ? 'notifications' : 'notifications-outline'} size={17} color={following ? c.primary : c.textMuted} />
     </Pressable>
   );
 }
@@ -392,25 +419,21 @@ export function CardSkeleton() {
   );
 }
 
-export function RowSkeleton() {
+export function RowSkeleton({ rows = 3 }: { rows?: number }) {
   const { c } = useTheme();
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        gap: space.md,
-        padding: space.md,
-        backgroundColor: c.surface,
-        borderRadius: radius.lg,
-        borderWidth: 1,
-        borderColor: c.border,
-      }}>
-      <Skeleton w={84} h={84} r={12} />
-      <View style={{ flex: 1, gap: 8, justifyContent: 'center' }}>
-        <Skeleton w={70} h={10} />
-        <Skeleton h={16} />
-        <Skeleton w="50%" h={12} />
-      </View>
+    <View>
+      {Array.from({ length: rows }, (_, i) => (
+        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md }}>
+          {i > 0 && <View style={{ position: 'absolute', top: 0, left: ROW_THUMB + space.md, right: 0, height: 1, backgroundColor: c.border }} />}
+          <Skeleton w={ROW_THUMB} h={ROW_THUMB} r={radius.md + 2} />
+          <View style={{ flex: 1, gap: 8 }}>
+            <Skeleton w="40%" h={10} />
+            <Skeleton w="85%" h={14} />
+            <Skeleton h={3} />
+          </View>
+        </View>
+      ))}
     </View>
   );
 }
@@ -511,6 +534,7 @@ export function CampaignTile({ c: campaign, width }: { c: CampaignSummary; width
             gap: 4,
           }}>
           <PhotoTag label={campaign.category} />
+          {campaign.hasVideo && <PhotoTag label="▶ Video" />}
           {!backable && <PhotoTag label={STATUS_META[campaign.status].label} />}
         </View>
       </View>
@@ -565,9 +589,6 @@ export function SpotlightCard({ c: campaign, width, height = 190 }: { c: Campaig
       })}>
       <Image source={campaign.coverImage} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} contentFit="cover" transition={200} accessibilityIgnoresInvertColors />
       <LinearGradient colors={['rgba(11,11,12,0.05)', 'rgba(11,11,12,0.35)', 'rgba(11,11,12,0.92)']} locations={[0, 0.4, 1]} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
-      <View style={{ position: 'absolute', left: 12, top: 12 }}>
-        <PhotoTag label="Featured" />
-      </View>
       <View
         style={{
           position: 'absolute',
@@ -759,6 +780,11 @@ export function PostCard({ c: campaign }: { c: CampaignSummary }) {
               height: 120,
             }}
           />
+          {campaign.hasVideo && (
+            <View pointerEvents="none" style={{ position: 'absolute', top: space.md, right: space.md }}>
+              <PhotoTag label="▶ Video" />
+            </View>
+          )}
         </Pressable>
         <View
           pointerEvents="box-none"

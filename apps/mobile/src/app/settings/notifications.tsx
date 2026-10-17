@@ -32,7 +32,26 @@ export default function NotificationSettings() {
       <Header title="Notifications" />
       <Body>
         {q.isPending ? (
-          <Skeleton h={400} r={16} />
+          // Shaped like the real page: intro line, then rows of icon, label and toggle.
+          <View style={{ gap: space.lg }}>
+            <View style={{ gap: 8 }}>
+              <Skeleton h={12} />
+              <Skeleton w="70%" h={12} />
+            </View>
+            <Card padded={false} style={{ paddingHorizontal: space.lg }}>
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <View key={i}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 60 }}>
+                    <Skeleton w={20} h={20} r={10} />
+                    <Skeleton w={`${45 + ((i * 13) % 30)}%`} h={14} style={{ flex: 0 }} />
+                    <View style={{ flex: 1 }} />
+                    <Skeleton w={44} h={26} r={13} />
+                  </View>
+                  {i < 5 && <Divider />}
+                </View>
+              ))}
+            </Card>
+          </View>
         ) : q.isError || !q.data ? (
           <ErrorState onRetry={() => q.refetch()} />
         ) : (

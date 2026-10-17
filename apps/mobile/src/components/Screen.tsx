@@ -7,7 +7,7 @@ import { space, useTheme } from '@/theme';
 import { IconButton, T } from './ui';
 
 /** Top bar used by every stack screen: consistent back behaviour and title. */
-export function Header({ title, onBack, right, subtitle, back = true }: { title?: string; subtitle?: string; onBack?: () => void; right?: ReactNode; back?: boolean }) {
+export function Header({ title, onBack, right, subtitle, back = true }: { title?: string; subtitle?: ReactNode; onBack?: () => void; right?: ReactNode; back?: boolean }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   return (
@@ -24,10 +24,12 @@ export function Header({ title, onBack, right, subtitle, back = true }: { title?
               {title}
             </T>
           )}
-          {!!subtitle && (
+          {typeof subtitle === 'string' ? (
             <T variant="small" color="textMuted" numberOfLines={1}>
               {subtitle}
             </T>
+          ) : (
+            subtitle
           )}
         </View>
         <View style={{ minWidth: 44, flexDirection: 'row', justifyContent: 'flex-end' }}>{right}</View>

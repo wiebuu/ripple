@@ -82,7 +82,7 @@ export const useCampaign = (id?: string) =>
 export const useReport = (id?: string) =>
   useQuery({
     queryKey: ['report', id],
-    queryFn: () => api<{ campaign: CampaignSummary; report: CampaignDetail['report'] }>(`/campaigns/${id}/report`),
+    queryFn: () => api<{ campaign: CampaignSummary; report: CampaignDetail['report']; isOwner: boolean }>(`/campaigns/${id}/report`),
     enabled: !!id,
   });
 

@@ -141,6 +141,10 @@ export function Card({ children, style, padded = true, onPress, accessibilityLab
   );
 }
 
+/**
+ * Selectable chip for choices in forms (category, locations, interests…): a soft fill with no outline,
+ * and a light green tint with green text when selected, so rows of chips stay calm.
+ */
 export function Chip({ label, selected, onPress, icon, count }: { label: string; selected?: boolean; onPress?: () => void; icon?: IconName; count?: number }) {
   const { c } = useTheme();
   return (
@@ -152,23 +156,41 @@ export function Chip({ label, selected, onPress, icon, count }: { label: string;
         onPress?.();
       }}
       style={({ pressed }) => ({
-        minHeight: 36,
-        paddingHorizontal: 14,
-        borderRadius: radius.pill,
-        borderWidth: 1,
-        borderColor: selected ? c.primary : c.border,
-        backgroundColor: selected ? c.primary : c.surface,
+        minHeight: 34,
+        paddingHorizontal: 12,
+        borderRadius: radius.sm + 2,
+        backgroundColor: selected ? c.primarySoft : c.surfaceAlt,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        opacity: pressed ? 0.8 : 1,
+        gap: 5,
+        opacity: pressed ? 0.75 : 1,
       })}>
-      {icon && <Icon name={icon} size={15} color={selected ? c.onPrimary : c.textMuted} />}
-      <T variant="smallStrong" style={{ color: selected ? c.onPrimary : c.text }}>
+      {icon && <Icon name={icon} size={14} color={selected ? c.primary : c.textMuted} />}
+      <T variant="small" style={{ fontWeight: selected ? '700' : '500', color: selected ? c.primary : c.text }}>
         {label}
         {count != null ? ` · ${count}` : ''}
       </T>
     </Pressable>
+  );
+}
+
+/** The app's marker for auto-fill and suggestion features: the word "Auto" in a small tinted badge. */
+export function AiBadge({ large, onImage }: { large?: boolean; onImage?: boolean }) {
+  const { c } = useTheme();
+  return (
+    <View
+      style={{
+        height: large ? 28 : 20,
+        paddingHorizontal: large ? 10 : 6,
+        borderRadius: large ? 14 : 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: onImage ? 'rgba(0,0,0,0.55)' : c.primarySoft,
+        borderWidth: onImage ? 0 : 1,
+        borderColor: c.primary,
+      }}>
+      <T style={{ fontSize: large ? 13 : 11, lineHeight: large ? 16 : 13, fontWeight: '800', letterSpacing: 0.6, color: onImage ? '#fff' : c.primary }}>Auto</T>
+    </View>
   );
 }
 

@@ -130,9 +130,21 @@ export default function Activity() {
         }
         ListEmptyComponent={
           feed.isPending ? (
-            <View style={{ gap: space.md, paddingTop: space.md }}>
-              {[0, 1, 2, 3].map((i) => (
-                <Skeleton key={i} h={64} r={12} />
+            // Shaped like notification rows: icon circle, a title with its time, and a body line or two.
+            <View style={{ paddingTop: space.sm }}>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <View key={i} style={{ flexDirection: 'row', gap: space.md, padding: space.md }}>
+                  <Skeleton w={40} h={40} r={20} />
+                  <View style={{ flex: 1, gap: 8, paddingTop: 2 }}>
+                    <View style={{ flexDirection: 'row', gap: space.md }}>
+                      <Skeleton w={`${50 + ((i * 17) % 30)}%`} h={13} />
+                      <View style={{ flex: 1 }} />
+                      <Skeleton w={28} h={10} />
+                    </View>
+                    <Skeleton h={10} />
+                    {i % 2 === 0 && <Skeleton w="60%" h={10} />}
+                  </View>
+                </View>
               ))}
             </View>
           ) : feed.isError ? (

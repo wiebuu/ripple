@@ -1,3 +1,4 @@
+import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 import { api } from './api';
@@ -16,12 +17,17 @@ export async function pickAndUpload(kind: 'image' | 'video' = 'image', opts: { a
     quality: 0.8,
     allowsEditing: kind === 'image' && !!opts.aspect,
     aspect: opts.aspect,
+    // iPhone videos are often hundreds of MB; export a compressed H.264 copy so it fits the 50 MB limit.
+    // (Deprecated upstream but still the only way to compress library picks; Android returns the original.)
+    ...(kind === 'video' && { videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality, preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible }),
   });
   if (r.canceled || !r.assets?.[0]) return null;
   const a = r.assets[0];
   const mime = a.mimeType ?? (kind === 'image' ? 'image/jpeg' : 'video/mp4');
   if (kind === 'image' && !['image/jpeg', 'image/png', 'image/webp'].includes(mime)) return { error: 'Use a JPG, PNG or WebP image.' };
-  if (a.fileSize && a.fileSize > (kind === 'image' ? MAX_IMAGE : MAX_VIDEO))
+  // The picker often leaves out the size (especially for videos); read it from the file so a too-big upload never starts.
+  const size = a.fileSize ?? fileSize(a.uri);
+  if (size && size > (kind === 'image' ? MAX_IMAGE : MAX_VIDEO))
     return { error: kind === 'image' ? 'Images must be under 8 MB.' : 'Videos must be under 50 MB.' };
   if (kind === 'image' && a.width && a.width < 600) return { error: 'This image is too small. Use one at least 600 pixels wide.' };
 
@@ -33,7 +39,18 @@ export async function pickAndUpload(kind: 'image' | 'video' = 'image', opts: { a
     const up = await api<{ url: string; kind: 'image' | 'video' }>('/uploads', { form });
     return { ...up, width: a.width, height: a.height };
   } catch (e: any) {
+    // A dropped connection mid-upload is almost always a file that's too large or a weak network, not the server being down.
+    if (e?.status === 0) return { error: kind === 'video' ? 'The video didn’t finish uploading. Try a shorter clip (under 50 MB) or a stronger connection.' : 'The image didn’t finish uploading. Check your connection and try again.' };
     return { error: e.message ?? 'Upload failed. Try again.' };
+  }
+}
+
+function fileSize(uri: string) {
+  if (Platform.OS === 'web') return undefined;
+  try {
+    return new File(uri).size ?? undefined;
+  } catch {
+    return undefined;
   }
 }
 

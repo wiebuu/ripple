@@ -15,6 +15,7 @@ import { useMyCampaigns } from '@/lib/queries';
 import { toast } from '@/lib/toast';
 import { radius, space, useTheme } from '@/theme';
 import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
+import { OwnCampaignSwipe } from '@/components/SwipeAction';
 
 /**
  * The two ways to start are a matched pair: `pattern` is the surface card with
@@ -99,9 +100,9 @@ export default function CreateTab() {
       </View>
 
       <StartOption look="pattern" icon="create-outline" title="Create manually" body="A guided editor with tips at every step and a full preview before you submit." meta={`5 steps · ${STEPS.join(' → ')}`} onPress={manual} loading={busy} />
-      <StartOption look="inverse" icon="mic-outline" title="Create with your voice" body="Answer four short questions out loud. AI turns your answers into a draft you can edit." meta="About 3 minutes · works with your keyboard’s dictation" onPress={() => router.push('/create/voice')} />
+      <StartOption look="inverse" icon="mic-outline" title="Create with your voice" body="Answer four short questions out loud. We turn your answers into a draft you can edit." meta="About 3 minutes · works with your keyboard’s dictation" onPress={() => router.push('/create/voice')} />
 
-      <View style={{ gap: space.md }}>
+      <View style={{ gap: space.xs }}>
         <T variant="heading">Your drafts</T>
         {mine.isPending ? (
           <RowSkeleton />
@@ -110,14 +111,18 @@ export default function CreateTab() {
         ) : drafts.length === 0 ? (
           <T color="textMuted">No drafts yet. Drafts save automatically as you type, so you can stop and come back any time.</T>
         ) : (
-          drafts.map((d) => (
+          drafts.map((d, i) => (
             <View key={d.id} style={{ gap: space.sm }}>
-              <CampaignRow
-                c={d}
-                meta={`${STATUS_META[d.status].label} · edited ${relTime(d.updatedAt)}`}
-                onPress={() => openEditor(d.id)}
-                right={<Icon name="chevron-forward" size={18} color={c.textSubtle} style={{ alignSelf: 'center' }} />}
-              />
+              {/* Swipe left to delete a draft (or cancel one that's in review). */}
+              <OwnCampaignSwipe c={d}>
+                <CampaignRow
+                  c={d}
+                  divider={i > 0}
+                  meta={`${STATUS_META[d.status].label} · edited ${relTime(d.updatedAt)}`}
+                  onPress={() => openEditor(d.id)}
+                  right={<Icon name="chevron-forward" size={18} color={c.textSubtle} style={{ alignSelf: 'center' }} />}
+                />
+              </OwnCampaignSwipe>
               {d.status === 'CHANGES_REQUESTED' && !!d.latestNote && <Banner tone="warning" icon="chatbubble-ellipses-outline" title="Reviewer asked for changes" body={d.latestNote} />}
             </View>
           ))

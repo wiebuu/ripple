@@ -91,6 +91,8 @@ export type CampaignSummary = {
   reachFactor: number;
   featured: boolean;
   isDemo: boolean;
+  /** The campaign has an ad video (shown as a "Video" tag on cards). */
+  hasVideo: boolean;
   publishedAt: string | null;
   submittedAt: string | null;
   endsAt: string | null;
@@ -140,6 +142,10 @@ export type CampaignReport = {
   endedAt: string | null;
   final: boolean;
   byChannel: { channel: ChannelKey; spend: number; impressions: number; clicks: number }[];
+  /** Delivery per app the ads ran on (simulated partner data in the prototype). */
+  byPlatform: { platform: PlatformKey; impressions: number; clicks: number }[];
+  /** Impressions per day since ads started (up to the last 14 days). */
+  daily: { day: string; impressions: number; clicks: number }[];
 };
 
 export type ContributionStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'REFUNDED';

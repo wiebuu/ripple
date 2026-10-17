@@ -2,28 +2,15 @@ import { useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { CHANNELS, DEFAULT_FUNDING_DAYS, FUNDING_DAY_OPTIONS, PLATFORMS, type PlatformKey, channelFactor, peoplePerHundred, type ChannelKey } from '@shared';
 import { fonts, radius, space, useTheme } from '@/theme';
-import { Banner, Card, Chip, Icon, IconButton, Pill, T, haptic, type IconName } from '../ui';
+import { Chip, Icon, IconButton, Pill, T, haptic, type IconName } from '../ui';
 import { AdPreview } from './VisualsStep';
 import { FieldError, Label, StepIntro, type StepProps } from './shared';
+import { PLATFORM_LOGOS } from '@/lib/platforms';
 
 const LOCATION_SUGGESTIONS = ['United States', 'California', 'New York, NY', 'Texas', 'Chicago, IL', 'London, UK', 'Toronto, Canada'];
 const INTERESTS = ['Local news', 'Parenting', 'Education', 'Environment', 'Public health', 'Volunteering', 'Small business', 'Transit', 'Arts', 'Science', 'Students', 'Housing'];
 const DURATIONS = [7, 14, 21, 30, 45, 60, 90];
 const NETWORKS = ['Meta', 'Google', 'More'] as const;
-/** Logo and brand colour per app; `null` colour falls back to the text colour (monochrome brands). */
-const PLATFORM_LOGOS: Record<PlatformKey, [IconName, string | null]> = {
-  facebook: ['logo-facebook', '#1877F2'],
-  instagram: ['logo-instagram', '#E1306C'],
-  google_search: ['logo-google', '#4285F4'],
-  youtube: ['logo-youtube', '#FF0033'],
-  google_display: ['logo-google', '#34A853'],
-  tiktok: ['logo-tiktok', null],
-  snapchat: ['logo-snapchat', '#F7C600'],
-  x: ['logo-x', null],
-  linkedin: ['logo-linkedin', '#0A66C2'],
-  reddit: ['logo-reddit', '#FF4500'],
-  pinterest: ['logo-pinterest', '#E60023'],
-};
 const PLACEMENT_ICONS: Record<ChannelKey, IconName> = {
   social_feed: 'images-outline',
   stories: 'phone-portrait-outline',
@@ -59,7 +46,12 @@ export function ReachStep({ d, update, errors }: StepProps) {
   return (
     <View style={{ gap: space.xl }}>
       <StepIntro title="Who should it reach?" body="Tell us where and who your audience is. The review team uses this to set up the ads." />
-      <Banner tone="info" icon="information-circle-outline" body="These are your preferences. The review team finalises targeting, bids and placements so they follow ad policies, and may adjust them." />
+      <View style={{ flexDirection: 'row', gap: 6 }}>
+        <Icon name="information-circle-outline" size={15} color={c.textMuted} style={{ marginTop: 2 }} />
+        <T variant="small" color="textMuted" style={{ flex: 1 }}>
+          These are your preferences. The review team finalises targeting, bids and placements so they follow ad policies, and may adjust them.
+        </T>
+      </View>
 
       <View style={{ gap: space.sm }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
@@ -187,7 +179,8 @@ export function ReachStep({ d, update, errors }: StepProps) {
         <FieldError error={errors['reach.durationDays']} />
       </View>
 
-      <Card style={{ gap: space.md }}>
+      {/* A plain section, not a card: the ad preview inside is the only box. */}
+      <View style={{ gap: space.md, paddingTop: space.lg, borderTopWidth: 1, borderTopColor: c.border }}>
         <T variant="overline" color="primary">
           Audience preview
         </T>
@@ -203,7 +196,7 @@ export function ReachStep({ d, update, errors }: StepProps) {
           </T>
         </View>
         <AdPreview d={d} placement="Feed" />
-      </Card>
+      </View>
     </View>
   );
 }

@@ -57,7 +57,7 @@ export default function VoiceCreate() {
       const r = await askAi(answers);
       const base = emptyDraft(user && !user.isGuest ? user.name : '');
       const id = await startDraft(applySuggestion(base, r.suggestion));
-      toast(r.demo ? 'Draft ready (demo AI). Review every step.' : 'Draft ready. Review every step.');
+      toast('Draft ready. Review every step.');
       router.replace({ pathname: '/create/[id]', params: { id, ai: '1' } });
     } catch (e) {
       toast(errorMessage(e), 'error');
@@ -121,8 +121,7 @@ export default function VoiceCreate() {
           <Button label="Hear the question" icon="volume-high-outline" variant="quiet" size="sm" onPress={() => { haptic.light(); Speech.stop(); Speech.speak(`${q.q} ${q.hint}`); }} />
           <Button label="Use a sample answer" icon="flask-outline" variant="quiet" size="sm" onPress={() => setAnswers((a) => ({ ...a, [q.key]: q.sample }))} />
           <Button
-            label="Auto-fill all answers with AI"
-            icon="sparkles-outline"
+            label="Auto-fill all answers"
             variant="quiet"
             size="sm"
             onPress={() => {
@@ -143,7 +142,7 @@ export default function VoiceCreate() {
         <Banner
           tone="neutral"
           icon="information-circle-outline"
-          body="AI drafts suggestions from your answers. You’ll land on an editable draft: nothing is submitted, and you set the funding goal yourself."
+          body="Your answers become a first draft. You’ll land on an editable draft: nothing is submitted, and you set the funding goal yourself."
           action={<View style={{ marginTop: 6 }}><Pill label="Speech-to-text by your keyboard" tone="neutral" /></View>}
         />
       </ScrollView>
@@ -151,7 +150,7 @@ export default function VoiceCreate() {
         <View style={{ flexDirection: 'row', gap: space.sm }}>
           {i > 0 && <Button label="Back" variant="secondary" style={{ flex: 1 }} onPress={() => setI(i - 1)} />}
           {last ? (
-            <Button label="Draft my campaign" icon="sparkles" style={{ flex: 2 }} onPress={draft} />
+            <Button label="Draft my campaign" iconRight="arrow-forward" style={{ flex: 2 }} onPress={draft} />
           ) : (
             <Button label={answers[q.key].trim() ? 'Next question' : 'Skip'} iconRight="arrow-forward" style={{ flex: 2 }} onPress={() => { haptic.light(); setI(i + 1); }} />
           )}

@@ -136,14 +136,18 @@ function HomeIntro({ featured }: { featured: ReturnType<typeof useCampaigns> }) 
             </T>
             <Icon name="information-circle-outline" size={14} color={c.primary} />
           </Pressable>
-          <View style={{ flexDirection: 'row', gap: space.sm, marginTop: 2 }}>
-            <Pressable accessibilityRole="button" onPress={() => { haptic.light(); router.navigate('/explore'); }} style={({ pressed }) => ({ flex: 1, height: 44, borderRadius: radius.md, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
-              <T variant="bodyStrong" style={{ color: c.onPrimary }}>
+          {/* One compact primary pill and a quiet text link, instead of two full-width blocks. */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.lg, marginTop: 2 }}>
+            <Pressable accessibilityRole="button" onPress={() => { haptic.light(); router.navigate('/explore'); }} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, height: 38, paddingHorizontal: space.lg, borderRadius: radius.pill, backgroundColor: c.primary, opacity: pressed ? 0.85 : 1 })}>
+              <T variant="smallStrong" style={{ color: c.onPrimary, fontSize: 14 }}>
                 Explore campaigns
               </T>
+              <Icon name="arrow-forward" size={14} color={c.onPrimary} />
             </Pressable>
-            <Pressable accessibilityRole="button" onPress={() => { haptic.light(); router.navigate('/create'); }} style={({ pressed }) => ({ flex: 1, height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
-              <T variant="bodyStrong">Start a campaign</T>
+            <Pressable accessibilityRole="button" hitSlop={8} onPress={() => { haptic.light(); router.navigate('/create'); }} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+              <T variant="smallStrong" color="primary" style={{ fontSize: 14 }}>
+                Start a campaign
+              </T>
             </Pressable>
           </View>
         </View>

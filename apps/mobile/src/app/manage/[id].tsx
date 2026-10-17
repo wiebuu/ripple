@@ -1,19 +1,19 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Platform, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { PUBLIC_STATUSES, STATUS_META, TIMELINE, estimateReach, feeBreakdown, timelineIndex } from '@shared';
 import { Accordion } from '@/components/Accordion';
 import { Field } from '@/components/Field';
 import { Body, Header } from '@/components/Screen';
 import { Sheet } from '@/components/Sheet';
-import { Banner, Button, Card, Divider, ErrorState, Icon, IconButton, Pill, ProgressBar, Skeleton, Stat, StatusPill, T } from '@/components/ui';
+import { Banner, Button, Card, Divider, ErrorState, Icon, IconButton, Pill, ProgressBar, Skeleton, Stat, StatusPill, T, type IconName } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
 import { openEditor } from '@/lib/create';
-import { useDrafts } from '@/lib/draft';
+import { canCancel, canDelete, cancelCampaign, cancelLabel, confirmDestructive, deleteDraft } from '@/lib/campaignActions';
 import { formatMoney, formatReach, pct, relTime, shortDate } from '@/lib/format';
 import { Countdown } from '@/components/campaign';
-import { invalidateCampaign, useCampaign, type Detail } from '@/lib/queries';
+import { useCampaign, type Detail } from '@/lib/queries';
 import { useBackOrPush } from '@/lib/nav';
 import { shareCampaign } from '@/lib/share';
 import { toast } from '@/lib/toast';
@@ -25,6 +25,9 @@ export default function Manage() {
   const { c } = useTheme();
   const q = useCampaign(id);
   const pull = usePullRefresh(q.refetch);
+  const [menu, setMenu] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const goTo = useBackOrPush();
 
   if (q.isPending)
     return (
@@ -47,10 +50,22 @@ export default function Manage() {
 
   const d = q.data;
   const isPublic = PUBLIC_STATUSES.includes(d.status);
+  // Editing lives in the header (pencil); destructive actions live behind the ⋯ menu.
+  const editable = d.status === 'DRAFT' || d.status === 'CHANGES_REQUESTED' || (d.status === 'FUNDING' && !d.hasPendingRevision);
+  const hasMenu = isPublic || canDelete(d.status) || canCancel(d.status);
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <Header title="Manage campaign" right={isPublic ? <IconButton icon="share-outline" label="Share campaign" onPress={() => shareCampaign(d)} /> : undefined} />
+      <Header
+        title="Manage campaign"
+        right={
+          <View style={{ flexDirection: 'row' }}>
+            {editable && <IconButton icon="create-outline" label="Edit campaign" onPress={() => openEditor(d.id, d.status === 'FUNDING' ? 1 : undefined)} />}
+            {isPublic && <IconButton icon="share-outline" label="Share campaign" onPress={() => shareCampaign(d)} />}
+            {hasMenu && <IconButton icon="ellipsis-horizontal" label="More actions" onPress={() => setMenu(true)} />}
+          </View>
+        }
+      />
       {pull.indicator()}
       <PullArea pull={pull} scrollInside>
       <Body refreshControl={pull.control()} onScroll={pull.onScroll} scrollEventThrottle={16} scrollGesture={pull.scrollGesture}>
@@ -97,34 +112,56 @@ export default function Manage() {
         </Card>
       </Body>
       </PullArea>
+
+      <Sheet visible={menu} onClose={() => setMenu(false)} title="Campaign actions">
+        <View style={{ borderRadius: radius.lg, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, overflow: 'hidden' }}>
+          {isPublic && (
+            <MenuRow first icon="open-outline" label="View public page" onPress={() => { setMenu(false); goTo('campaign/[id]/index', { pathname: '/campaign/[id]', params: { id: d.id } }, d.id); }} />
+          )}
+          {canDelete(d.status) && (
+            <MenuRow
+              first={!isPublic}
+              danger
+              icon="trash-outline"
+              label="Delete draft"
+              onPress={() => {
+                setMenu(false);
+                confirmDestructive('Delete this draft?', 'This can’t be undone.', 'Delete', async () => {
+                  if (await deleteDraft(d.id)) router.back();
+                });
+              }}
+            />
+          )}
+          {canCancel(d.status) && (
+            <MenuRow first={!isPublic} danger icon="close-circle-outline" label={cancelLabel(d.status)} onPress={() => { setMenu(false); setCancelOpen(true); }} />
+          )}
+        </View>
+      </Sheet>
+      <CancelSheet d={d} open={cancelOpen} onClose={() => setCancelOpen(false)} />
     </View>
+  );
+}
+
+/** A row in the ⋯ menu; destructive actions are red. */
+function MenuRow({ icon, label, onPress, danger, first }: { icon: IconName; label: string; onPress: () => void; danger?: boolean; first?: boolean }) {
+  const { c } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, height: 52, paddingHorizontal: space.lg, borderTopWidth: first ? 0 : 1, borderTopColor: c.border, backgroundColor: pressed ? c.surfaceAlt : 'transparent' })}>
+      <Icon name={icon} size={19} color={danger ? c.danger : c.text} />
+      <T variant="bodyStrong" style={{ color: danger ? c.danger : c.text }}>
+        {label}
+      </T>
+    </Pressable>
   );
 }
 
 function NextStep({ d }: { d: Detail }) {
   const { c } = useTheme();
-  const removeLocal = useDrafts((s) => s.remove);
   const goTo = useBackOrPush();
-  const [deleting, setDeleting] = useState(false);
   const note = [...d.reviewNotes].reverse().find((n) => n.action === 'CHANGES_REQUESTED' || n.action === 'REJECTED')?.note;
-
-  const del = () => {
-    const go = async () => {
-      setDeleting(true);
-      try {
-        await api(`/drafts/${d.id}`, { method: 'DELETE' });
-        removeLocal(d.id);
-        invalidateCampaign(d.id);
-        toast('Draft deleted');
-        router.back();
-      } catch (e) {
-        toast(errorMessage(e), 'error');
-        setDeleting(false);
-      }
-    };
-    if (Platform.OS === 'web') return go();
-    Alert.alert('Delete this draft?', 'This can’t be undone.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: go }]);
-  };
 
   const view = <Button label="View public page" variant="secondary" icon="open-outline" onPress={() => goTo('campaign/[id]/index', { pathname: '/campaign/[id]', params: { id: d.id } }, d.id)} />;
 
@@ -133,16 +170,13 @@ function NextStep({ d }: { d: Detail }) {
       return (
         <Card style={{ gap: space.md }}>
           <T variant="subheading">Finish your draft</T>
-          <T color="textMuted">Complete all five steps and submit it for review. Your progress is saved automatically.</T>
-          <Button label="Continue editing" icon="create-outline" onPress={() => openEditor(d.id)} />
-          <Button label="Delete draft" variant="danger" size="sm" loading={deleting} onPress={del} />
+          <T color="textMuted">Complete all five steps and submit it for review. Your progress is saved automatically. Tap the pencil above to keep editing.</T>
         </Card>
       );
     case 'SUBMITTED':
       return (
         <View style={{ gap: space.md }}>
           <Banner tone="info" icon="hourglass-outline" title="In review" body="We’re checking your sources, visuals and targeting. Editing is paused until we respond, usually within 1–2 business days." />
-          <CancelCampaign d={d} label="Withdraw from review" />
         </View>
       );
     case 'CHANGES_REQUESTED':
@@ -153,8 +187,9 @@ function NextStep({ d }: { d: Detail }) {
             <T variant="subheading">The reviewer asked for changes</T>
           </View>
           {!!note && <T style={{ fontStyle: 'italic' }}>“{note}”</T>}
-          <Button label="Edit and resubmit" icon="create-outline" onPress={() => openEditor(d.id)} />
-          <CancelCampaign d={d} />
+          <T variant="small" color="textMuted">
+            Tap the pencil above to make the changes and resubmit.
+          </T>
         </Card>
       );
     case 'REJECTED':
@@ -171,9 +206,8 @@ function NextStep({ d }: { d: Detail }) {
           <T variant="subheading">Open for backing</T>
           <T color="textMuted">Share your campaign with people who already support you; their backing pays to reach people who don’t know about it yet.</T>
           <Button label="Share campaign" icon="share-outline" onPress={() => shareCampaign(d)} />
-          {d.hasPendingRevision ? <Banner tone="info" icon="time-outline" body="Your edits are waiting for review. The live page hasn’t changed." /> : <Button label="Edit campaign" variant="secondary" icon="create-outline" onPress={() => openEditor(d.id, 1)} />}
+          {d.hasPendingRevision && <Banner tone="info" icon="time-outline" body="Your edits are waiting for review. The live page hasn’t changed." />}
           {view}
-          <CancelCampaign d={d} />
         </Card>
       );
     case 'FUNDED':
@@ -194,45 +228,34 @@ function NextStep({ d }: { d: Detail }) {
   }
 }
 
-/** Creator cancels (or withdraws) a campaign. Raised funds are refunded automatically. */
-function CancelCampaign({ d, label = 'Cancel campaign' }: { d: Detail; label?: string }) {
-  const [open, setOpen] = useState(false);
+/** Confirm sheet for cancelling (or withdrawing) a campaign, with an optional reason. Raised funds are refunded. */
+function CancelSheet({ d, open, onClose }: { d: Detail; open: boolean; onClose: () => void }) {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const label = cancelLabel(d.status);
   const cancel = async () => {
     setBusy(true);
-    try {
-      await api(`/drafts/${d.id}/cancel`, { body: { reason: reason.trim() || undefined } });
-      invalidateCampaign(d.id);
-      setOpen(false);
-      toast(d.raised > 0 ? 'Campaign cancelled. Backers are being refunded.' : 'Campaign cancelled');
-    } catch (e) {
-      toast(errorMessage(e), 'error');
-    } finally {
-      setBusy(false);
-    }
+    if (await cancelCampaign(d.id, d.raised, reason)) onClose();
+    setBusy(false);
   };
   return (
-    <>
-      <Button label={label} variant="danger" size="sm" onPress={() => setOpen(true)} />
-      <Sheet
-        visible={open}
-        onClose={() => setOpen(false)}
-        title={`${label}?`}
-        footer={
-          <View style={{ gap: space.sm }}>
-            <Button label={label} variant="danger" size="lg" loading={busy} onPress={cancel} />
-            <Button label="Keep campaign" variant="ghost" size="sm" onPress={() => setOpen(false)} />
-          </View>
-        }>
-        <T>
-          {d.raised > 0
-            ? `${formatMoney(d.raised)} from ${d.backerCount} backers will be refunded in full, and the campaign will close. This can’t be undone.`
-            : 'The campaign will close and won’t be published or advertised. This can’t be undone.'}
-        </T>
-        <Field label="Reason" value={reason} onChangeText={setReason} max={500} softMax multiline placeholder="Optional. Shared with backers and the review team." />
-      </Sheet>
-    </>
+    <Sheet
+      visible={open}
+      onClose={onClose}
+      title={`${label}?`}
+      footer={
+        <View style={{ gap: space.sm }}>
+          <Button label={label} variant="danger" size="lg" loading={busy} onPress={cancel} />
+          <Button label="Keep campaign" variant="ghost" size="sm" onPress={onClose} />
+        </View>
+      }>
+      <T>
+        {d.raised > 0
+          ? `${formatMoney(d.raised)} from ${d.backerCount} backers will be refunded in full, and the campaign will close. This can’t be undone.`
+          : 'The campaign will close and won’t be published or advertised. This can’t be undone.'}
+      </T>
+      <Field label="Reason" value={reason} onChangeText={setReason} max={500} softMax multiline placeholder="Optional. Shared with backers and the review team." />
+    </Sheet>
   );
 }
 

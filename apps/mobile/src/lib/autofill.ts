@@ -1,4 +1,4 @@
-import { AD_DESCRIPTION_MAX, AD_HEADLINE_MAX, CTA_MAX, SUMMARY_MAX, TITLE_MAX, type DraftContent, type Source } from '@shared';
+import { sampleVideo, AD_DESCRIPTION_MAX, AD_HEADLINE_MAX, CTA_MAX, SUMMARY_MAX, TITLE_MAX, type DraftContent, type Source } from '@shared';
 import { askAi, type AiSuggestion, type VoiceAnswers } from './create';
 import { uid } from './format';
 
@@ -127,7 +127,7 @@ export async function autofillWiecodes(update: (fn: (d: DraftContent) => DraftCo
     if (all || target === 2) {
       x = {
         ...x,
-        visuals: { ...x.visuals, coverImage: photo(PHOTOS.laptop), adImages: [photo(PHOTOS.code, 800), photo(PHOTOS.workspace, 800)], adHeadline: t.adHeadline, adDescription: t.adDescription, ctaText: t.ctaText },
+        visuals: { ...x.visuals, coverImage: photo(PHOTOS.laptop), adImages: [photo(PHOTOS.code, 800), photo(PHOTOS.workspace, 800)], adVideo: sampleVideo('coding').url, adHeadline: t.adHeadline, adDescription: t.adDescription, ctaText: t.ctaText },
       };
     }
     if (all || target === 3) {

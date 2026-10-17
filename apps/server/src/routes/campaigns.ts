@@ -240,6 +240,7 @@ campaigns.get(
   ah(async (req, res) => {
     const c = await db.campaign.findUnique({ where: { id: req.params.id }, include: { report: true } });
     if (!c || !PUBLIC_STATUSES.includes(c.status as any)) throw notFound('Report');
-    res.json({ campaign: toSummary(c), report: toReport(c, c.report) });
+    // Owners see the full money breakdown; backers and visitors get the delivery picture.
+    res.json({ campaign: toSummary(c), report: toReport(c, c.report), isOwner: req.user?.id === c.ownerId });
   }),
 );

@@ -12,21 +12,23 @@ type Props = TextInputProps & {
   max?: number;
   /** Soft limit: show the counter but allow typing past it (validation explains). */
   softMax?: boolean;
+  /** Drop the label row when the context already names the field (still used for accessibility); the counter then shows only near the limit. */
+  hideLabel?: boolean;
 };
 
 /** Labelled input with helper text, inline error and optional character counter. */
-export function Field({ label, required, helper, error, max, softMax, multiline, value, style, ref, ...rest }: Props) {
+export function Field({ label, required, helper, error, max, softMax, hideLabel, multiline, value, style, ref, ...rest }: Props) {
   const { c } = useTheme();
   const [focused, setFocused] = useState(false);
   const len = value?.length ?? 0;
   const over = max != null && len > max;
   return (
     <View style={{ gap: 6 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <T variant="smallStrong">
+      <View style={{ flexDirection: 'row', justifyContent: hideLabel ? 'flex-end' : 'space-between', alignItems: 'baseline', display: hideLabel && (max == null || len <= max * 0.8) ? 'none' : 'flex' }}>
+        {!hideLabel && <T variant="smallStrong">
           {label}
           {required ? <T variant="smallStrong" color="danger">{' *'}</T> : <T variant="small" color="textSubtle">{'  optional'}</T>}
-        </T>
+        </T>}
         {max != null && (
           <T variant="small" color={over ? 'danger' : len > max * 0.9 ? 'warning' : 'textSubtle'} accessibilityLabel={`${len} of ${max} characters`}>
             {len}/{max}

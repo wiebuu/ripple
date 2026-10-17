@@ -11,10 +11,16 @@ import { Banner, Button, Card, Chip, Pill, T } from '../ui';
 import { ImageSlot } from './ImageSlot';
 import { FieldError, Label, StepIntro, Tip, type StepProps } from './shared';
 
-export function BasicsStep({ d, update, errors }: StepProps) {
+export function BasicsStep({ d, update, errors, suggestSignal = 0 }: StepProps & { suggestSignal?: number }) {
   const b = d.basics;
   const set = (p: Partial<typeof b>) => update((x) => ({ ...x, basics: { ...x.basics, ...p } }));
   const [aiOpen, setAiOpen] = useState(false);
+  // Opened from the editor's "Auto-fill" sheet.
+  const [seenSignal, setSeenSignal] = useState(suggestSignal);
+  if (suggestSignal !== seenSignal) {
+    setSeenSignal(suggestSignal);
+    setAiOpen(true);
+  }
   const [about, setAbout] = useState('');
   const [busy, setBusy] = useState(false);
   const [sugg, setSugg] = useState<{ demo: boolean; s: AiSuggestion } | null>(null);
@@ -34,7 +40,6 @@ export function BasicsStep({ d, update, errors }: StepProps) {
   return (
     <View style={{ gap: space.xl }}>
       <StepIntro title="The basics" body="What the campaign is about and who is behind it. You can change any of this later." />
-      <Button label="Suggest with AI" icon="sparkles-outline" variant="secondary" onPress={() => setAiOpen(true)} style={{ alignSelf: 'flex-start' }} />
 
       <Field
         label="Campaign title"
@@ -87,16 +92,16 @@ export function BasicsStep({ d, update, errors }: StepProps) {
 
       <Tip>Lead with the change you want, not the problem. “Keep the shelter open past 7am” travels further than “Homelessness in our city”.</Tip>
 
-      <Sheet visible={aiOpen} onClose={() => { setAiOpen(false); setSugg(null); }} title="Suggest with AI">
+      <Sheet visible={aiOpen} onClose={() => { setAiOpen(false); setSugg(null); }} title="Suggest a title">
         {!sugg ? (
           <>
-            <T color="textMuted">Describe your campaign in a few sentences. AI will suggest a title, summary and category. Nothing changes until you choose to apply it.</T>
+            <T color="textMuted">Describe your campaign in a few sentences. We’ll suggest a title, summary and category. Nothing changes until you choose to apply it.</T>
             <Field label="What is your campaign about?" required value={about} onChangeText={setAbout} multiline placeholder={b.title || 'e.g. Our library closes at 5pm so working parents can’t use it…'} />
-            <Button label="Get suggestions" icon="sparkles-outline" loading={busy} disabled={!about.trim() && !b.title.trim()} onPress={suggest} />
+            <Button label="Get suggestions" loading={busy} disabled={!about.trim() && !b.title.trim()} onPress={suggest} />
           </>
         ) : (
           <>
-            {sugg.demo && <Pill label="Demo AI: offline suggestions" tone="accent" />}
+            {sugg.demo && <Pill label="Sample suggestions" tone="accent" />}
             <Card style={{ gap: space.md }}>
               <Suggest label="Title" value={sugg.s.title} onApply={() => set({ title: sugg.s.title.slice(0, TITLE_MAX) })} />
               <Suggest label="Summary" value={sugg.s.summary} onApply={() => set({ summary: sugg.s.summary.slice(0, SUMMARY_MAX) })} />
@@ -111,7 +116,7 @@ export function BasicsStep({ d, update, errors }: StepProps) {
                 toast('Suggestions applied. Edit anything you like.');
               }}
             />
-            <Banner tone="neutral" icon="create-outline" body="Suggestions are a starting point. You can edit or delete anything AI wrote." />
+            <Banner tone="neutral" icon="create-outline" body="Suggestions are a starting point. You can edit or delete anything we suggested." />
           </>
         )}
       </Sheet>

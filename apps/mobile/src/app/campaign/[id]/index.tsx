@@ -18,6 +18,9 @@ import { useBackOrPush } from '@/lib/nav';
 import { shareCampaign } from '@/lib/share';
 import { toast } from '@/lib/toast';
 import { radius, space, useTheme } from '@/theme';
+import { Sparkline } from '@/components/charts';
+import { PLATFORM_LOGOS } from '@/lib/platforms';
+import { CampaignVideo } from '@/components/CampaignVideo';
 
 export default function CampaignScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -111,21 +114,26 @@ export default function CampaignScreen() {
           </T>
 
           {!!d.isOwner && (
-            <Banner
-              tone="info"
-              icon="person-circle-outline"
-              title="This is your campaign"
-              body={STATUS_META[d.status].description}
-              action={
-                <Button
-                  label="Manage campaign"
-                  size="sm"
-                  variant="secondary"
-                  style={{ alignSelf: 'flex-start', marginTop: 6 }}
-                  onPress={() => goTo('manage/[id]', { pathname: '/manage/[id]', params: { id: d.id } }, d.id)}
-                />
-              }
-            />
+            // One slim row for the owner instead of a banner with a button: tap anywhere to manage.
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Your campaign, ${STATUS_META[d.status].label}. Manage campaign`}
+              onPress={() => goTo('manage/[id]', { pathname: '/manage/[id]', params: { id: d.id } }, d.id)}
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, paddingHorizontal: space.lg, borderRadius: radius.lg, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, opacity: pressed ? 0.7 : 1 })}>
+              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="person-outline" size={17} color={c.primary} />
+              </View>
+              <View style={{ flex: 1, gap: 1 }}>
+                <T variant="bodyStrong">Your campaign</T>
+                <T variant="small" color="textMuted" numberOfLines={1}>
+                  {STATUS_META[d.status].label}
+                </T>
+              </View>
+              <T variant="smallStrong" color="primary">
+                Manage
+              </T>
+              <Icon name="chevron-forward" size={16} color={c.primary} />
+            </Pressable>
           )}
 
           <View onLayout={(e) => setFundEnd(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}>
@@ -133,7 +141,8 @@ export default function CampaignScreen() {
           </View>
         </View>
 
-        <View style={{ paddingHorizontal: space.xl, paddingTop: space.xxxl }}>
+        <View style={{ paddingHorizontal: space.xl, paddingTop: space.xxxl, gap: space.xl }}>
+          {!!d.visuals.adVideo && <CampaignVideo uri={d.visuals.adVideo} />}
           <StoryView story={d.story} />
         </View>
 
@@ -185,17 +194,53 @@ export default function CampaignScreen() {
 
         {(d.status === 'PROMOTING' || d.status === 'COMPLETED') && (
           <View style={{ paddingHorizontal: space.xl, paddingTop: space.xxl }}>
-            <Card onPress={() => router.push({ pathname: '/campaign/[id]/report', params: { id: d.id } })} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-              <View style={{ flex: 1, gap: 4 }}>
-                <T variant="overline" color="primary">
-                  {d.report?.final ? 'Final report' : 'Distribution report'}
-                </T>
-                <T variant="subheading">See where the money went</T>
-                <T variant="small" color="textMuted">
-                  {d.report?.impressions ? `${formatReach(d.report.impressions)} impressions measured so far` : 'Delivery numbers appear once ads start'}
-                </T>
+            {/* A report preview anyone (backers included) can open: headline numbers, the daily trend and the top apps. */}
+            <Card onPress={() => router.push({ pathname: '/campaign/[id]/report', params: { id: d.id } })} style={{ gap: space.md }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <T variant="overline" color="primary">
+                    {d.report?.final ? 'Final report' : 'How the ads are doing'}
+                  </T>
+                  <T variant="subheading">See how far the message travelled</T>
+                </View>
+                <Icon name="chevron-forward" size={20} color={c.textSubtle} />
               </View>
-              <Icon name="chevron-forward" size={20} color={c.textSubtle} />
+              {d.report?.impressions ? (
+                <>
+                  <View style={{ flexDirection: 'row' }}>
+                    {[
+                      ['shown', d.report.impressions],
+                      ['people reached', d.report.measuredReach ?? 0],
+                      ['clicks', d.report.clicks ?? 0],
+                    ].map(([k, v]) => (
+                      <View key={k as string} style={{ flex: 1, gap: 2 }}>
+                        <T variant="bodyStrong" style={{ fontVariant: ['tabular-nums'] }}>
+                          {formatReach(v as number)}
+                        </T>
+                        <T variant="small" color="textMuted" style={{ fontSize: 12 }}>
+                          {k as string}
+                        </T>
+                      </View>
+                    ))}
+                  </View>
+                  <Sparkline values={d.report.daily.map((x) => x.impressions)} />
+                  {d.report.byPlatform.length > 0 && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                      <T variant="small" color="textMuted" style={{ fontSize: 12 }}>
+                        Top apps
+                      </T>
+                      {d.report.byPlatform.slice(0, 4).map((p) => {
+                        const [logo, brand] = PLATFORM_LOGOS[p.platform];
+                        return <Icon key={p.platform} name={logo} size={16} color={brand ?? c.text} />;
+                      })}
+                    </View>
+                  )}
+                </>
+              ) : (
+                <T variant="small" color="textMuted">
+                  Delivery numbers appear once ads start.
+                </T>
+              )}
             </Card>
           </View>
         )}

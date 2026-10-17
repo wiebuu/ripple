@@ -5,7 +5,7 @@ import { uid } from '@/lib/format';
 import { fonts, radius, space, useTheme } from '@/theme';
 import { Field } from '../Field';
 import { StoryView } from '../Story';
-import { Button, Card, Chip, IconButton, T, haptic, type IconName } from '../ui';
+import { Button, Card, Chip, Icon, IconButton, T, haptic, type IconName } from '../ui';
 import { ImageSlot } from './ImageSlot';
 import { FieldError, Label, StepIntro, Tip, type StepProps } from './shared';
 
@@ -92,45 +92,56 @@ export function StoryStep({ d, update, errors }: StepProps) {
           />
 
           <View style={{ gap: space.md }}>
-            <Label text="Story sections" hint="Add headings, paragraphs, photos, statistics and quotes. Use the arrows to reorder." />
-            {s.blocks.map((b, i) => (
-              <Card key={b.id} style={{ gap: space.md, borderColor: errors[`story.blocks.${i}`] ? c.danger : c.border }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <T variant="overline" color="primary" style={{ flex: 1 }}>
-                    {BLOCK_TYPES.find((t) => t.type === b.type)!.label}
-                  </T>
-                  <IconButton icon="arrow-up" label="Move up" size={18} onPress={() => move(i, -1)} />
-                  <IconButton icon="arrow-down" label="Move down" size={18} onPress={() => move(i, 1)} />
-                  <IconButton icon="trash-outline" label="Delete section" size={18} onPress={() => setBlocks((bs) => bs.filter((x) => x.id !== b.id))} />
+            <Label text="Story sections" hint="Headings, paragraphs, photos, statistics and quotes, in reading order." />
+            {s.blocks.map((b, i) => {
+              const kind = BLOCK_TYPES.find((t) => t.type === b.type)!;
+              return (
+                // Flat sections split by hairlines, not cards, so the story reads like one document.
+                <View key={b.id} style={{ gap: space.sm, paddingTop: i ? space.lg : 0, borderTopWidth: i ? 1 : 0, borderTopColor: c.border }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Icon name={kind.icon} size={14} color={c.textMuted} />
+                    <T variant="small" color="textMuted" style={{ flex: 1 }}>
+                      {kind.label}
+                    </T>
+                    <Tool icon="arrow-up" label={`Move ${kind.label.toLowerCase()} up`} disabled={i === 0} onPress={() => move(i, -1)} />
+                    <Tool icon="arrow-down" label={`Move ${kind.label.toLowerCase()} down`} disabled={i === s.blocks.length - 1} onPress={() => move(i, 1)} />
+                    <Tool icon="trash-outline" label={`Delete ${kind.label.toLowerCase()}`} onPress={() => setBlocks((bs) => bs.filter((x) => x.id !== b.id))} />
+                  </View>
+                  <BlockEditor b={b} sources={s.sources} category={d.basics.category} onChange={(p) => setBlock(b.id, p)} />
+                  <FieldError error={errors[`story.blocks.${i}`]} />
                 </View>
-                <BlockEditor b={b} sources={s.sources} category={d.basics.category} onChange={(p) => setBlock(b.id, p)} />
-                <FieldError error={errors[`story.blocks.${i}`]} />
-              </Card>
-            ))}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-              {BLOCK_TYPES.map((t) => (
-                <Chip key={t.type} label={t.label} icon="add" onPress={() => setBlocks((bs) => [...bs, newBlock(t.type)])} />
-              ))}
+              );
+            })}
+            <View style={{ gap: space.sm, paddingTop: space.sm }}>
+              <T variant="small" color="textMuted">
+                Add a section
+              </T>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+                {BLOCK_TYPES.map((t) => (
+                  <Chip key={t.type} label={t.label} icon={t.icon} onPress={() => setBlocks((bs) => [...bs, newBlock(t.type)])} />
+                ))}
+              </View>
             </View>
           </View>
 
           <View style={{ gap: space.md }}>
             <Label text="Sources" required hint="Readers see these on your campaign page. Link to the reports, articles or data behind your claims." />
             {s.sources.map((src, i) => (
-              <Card key={src.id} style={{ gap: space.md }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <T variant="overline" color="primary" style={{ flex: 1 }}>
+              <View key={src.id} style={{ gap: space.md, paddingTop: i ? space.lg : 0, borderTopWidth: i ? 1 : 0, borderTopColor: c.border }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Icon name="link-outline" size={14} color={c.textMuted} />
+                  <T variant="small" color="textMuted" style={{ flex: 1 }}>
                     Source {i + 1}
                   </T>
-                  <IconButton icon="trash-outline" label={`Remove source ${i + 1}`} size={18} onPress={() => setSources((x) => x.filter((y) => y.id !== src.id))} />
+                  <Tool icon="trash-outline" label={`Remove source ${i + 1}`} onPress={() => setSources((x) => x.filter((y) => y.id !== src.id))} />
                 </View>
                 <Field label="Title" required value={src.title} onChangeText={(t) => setSources((x) => x.map((y) => (y.id === src.id ? { ...y, title: t } : y)))} placeholder="e.g. Lead in drinking water: basic information" error={errors[`story.sources.${i}.title`]} />
                 <Field label="Link" required value={src.url} onChangeText={(t) => setSources((x) => x.map((y) => (y.id === src.id ? { ...y, url: t.trim() } : y)))} placeholder="https://" keyboardType="url" autoCapitalize="none" autoCorrect={false} error={errors[`story.sources.${i}.url`]} />
                 <Field label="Publisher" value={src.publisher ?? ''} onChangeText={(t) => setSources((x) => x.map((y) => (y.id === src.id ? { ...y, publisher: t } : y)))} placeholder="e.g. US EPA" />
-              </Card>
+              </View>
             ))}
             <FieldError error={errors['story.sources']} />
-            <Button label="Add a source" icon="link-outline" variant="secondary" onPress={() => setSources((x) => [...x, { id: uid(), title: '', url: '' }])} disabled={s.sources.length >= 20} />
+            <Button label="Add a source" icon="add" variant="ghost" size="sm" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} onPress={() => setSources((x) => [...x, { id: uid(), title: '', url: '' }])} disabled={s.sources.length >= 20} />
           </View>
 
           <View style={{ gap: space.md }}>
@@ -149,7 +160,7 @@ export function StoryStep({ d, update, errors }: StepProps) {
                 <IconButton icon="close" label={`Remove action ${i + 1}`} size={18} onPress={() => setStory({ actions: s.actions.filter((_, j) => j !== i) })} />
               </View>
             ))}
-            {s.actions.length < 6 && <Button label="Add an action" icon="add" variant="quiet" size="sm" style={{ alignSelf: 'flex-start' }} onPress={() => setStory({ actions: [...s.actions, ''] })} />}
+            {s.actions.length < 6 && <Button label="Add an action" icon="add" variant="ghost" size="sm" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} onPress={() => setStory({ actions: [...s.actions, ''] })} />}
           </View>
 
           <Tip>Every factual claim should point to a source. Reviewers check claims against the links you add, and readers can open them too.</Tip>
@@ -162,7 +173,7 @@ export function StoryStep({ d, update, errors }: StepProps) {
 function BlockEditor({ b, sources, category, onChange }: { b: StoryBlock; sources: Source[]; category: string; onChange: (p: Partial<StoryBlock>) => void }) {
   switch (b.type) {
     case 'heading':
-      return <Field label="Heading" required value={b.text} onChangeText={(t) => onChange({ text: t })} max={160} placeholder="e.g. Why it matters" />;
+      return <Field label="Heading" hideLabel required value={b.text} onChangeText={(t) => onChange({ text: t })} max={160} placeholder="e.g. Why it matters" style={{ fontFamily: fonts.sansSemibold, fontSize: 18 }} />;
     case 'paragraph':
       return <RichField value={b.text} onChange={(t) => onChange({ text: t })} />;
     case 'image':
@@ -191,7 +202,7 @@ function BlockEditor({ b, sources, category, onChange }: { b: StoryBlock; source
     case 'quote':
       return (
         <View style={{ gap: space.md }}>
-          <Field label="Quote" required value={b.text} onChangeText={(t) => onChange({ text: t })} multiline max={600} softMax />
+          <Field label="Quote" hideLabel required value={b.text} onChangeText={(t) => onChange({ text: t })} multiline max={600} softMax />
           <Field label="Who said it" value={b.attribution ?? ''} onChangeText={(t) => onChange({ attribution: t })} max={120} placeholder="e.g. Volunteer coordinator" />
         </View>
       );
@@ -215,15 +226,6 @@ function RichField({ value, onChange }: { value: string; onChange: (t: string) =
   ];
   return (
     <View style={{ borderRadius: radius.md, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface, overflow: 'hidden' }}>
-      <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: c.surfaceAlt }} accessibilityRole="toolbar">
-        {tools.map((t) => (
-          <Pressable key={t.label} accessibilityRole="button" accessibilityLabel={t.label} onPress={t.run} style={{ height: 40, paddingHorizontal: space.md, alignItems: 'center', justifyContent: 'center' }}>
-            <T variant="smallStrong" style={t.label === 'Bold' ? { fontWeight: '800' } : t.label === 'Italic' ? { fontStyle: 'italic' } : { textDecorationLine: 'underline' }}>
-              {t.label}
-            </T>
-          </Pressable>
-        ))}
-      </View>
       <TextInput
         value={value}
         onChangeText={onChange}
@@ -233,8 +235,38 @@ function RichField({ value, onChange }: { value: string; onChange: (t: string) =
         placeholder="Write a paragraph…"
         placeholderTextColor={c.textSubtle}
         accessibilityLabel="Paragraph text"
-        style={{ minHeight: 120, padding: space.md, color: c.text, fontFamily: fonts.sans, fontSize: 16, lineHeight: 25, textAlignVertical: 'top' }}
+        style={{ minHeight: 120, padding: space.md, paddingBottom: space.sm, color: c.text, fontFamily: fonts.sans, fontSize: 16, lineHeight: 25, textAlignVertical: 'top' }}
       />
+      {/* A slim formatting row under the text, in quiet text rather than a toolbar strip. */}
+      <View style={{ flexDirection: 'row', gap: 2, paddingHorizontal: space.xs, paddingBottom: 4 }} accessibilityRole="toolbar">
+        {tools.map((t) => (
+          <Pressable key={t.label} accessibilityRole="button" accessibilityLabel={t.label} onPress={t.run} hitSlop={4} style={({ pressed }) => ({ height: 30, paddingHorizontal: space.sm, borderRadius: radius.sm, justifyContent: 'center', backgroundColor: pressed ? c.surfaceAlt : 'transparent' })}>
+            <T variant="small" color="textMuted" style={t.label === 'Bold' ? { fontWeight: '800' } : t.label === 'Italic' ? { fontStyle: 'italic' } : { textDecorationLine: 'underline' }}>
+              {t.label}
+            </T>
+          </Pressable>
+        ))}
+      </View>
     </View>
+  );
+}
+
+/** Small, quiet section control (reorder, delete), so the controls don't compete with the writing. */
+function Tool({ icon, label, onPress, disabled }: { icon: IconName; label: string; onPress: () => void; disabled?: boolean }) {
+  const { c } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      hitSlop={6}
+      onPress={() => {
+        haptic.light();
+        onPress();
+      }}
+      style={({ pressed }) => ({ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? c.surfaceAlt : 'transparent', opacity: disabled ? 0.35 : 1 })}>
+      <Icon name={icon} size={16} color={c.textMuted} />
+    </Pressable>
   );
 }

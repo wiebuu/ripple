@@ -20,11 +20,11 @@ export default function Backed() {
       <FlatList
         data={q.data?.items ?? []}
         keyExtractor={(x) => x.id}
-        contentContainerStyle={{ padding: space.xl, gap: space.md }}
+        contentContainerStyle={{ paddingHorizontal: space.xl, paddingTop: space.xs, paddingBottom: space.huge }}
         refreshControl={pull.control()}
         onScroll={pull.onScroll}
         scrollEventThrottle={16}
-        renderItem={({ item }) => <CampaignRow c={item} meta={`You contributed ${formatMoney(item.myTotal, true)}`} />}
+        renderItem={({ item, index }) => <CampaignRow c={item} divider={index > 0} meta={`You contributed ${formatMoney(item.myTotal, true)}`} />}
         ListEmptyComponent={
           q.isPending ? <RowSkeleton /> : q.isError ? <ErrorState onRetry={() => q.refetch()} /> : (
             <EmptyState icon="megaphone-outline" title="You haven’t backed a campaign yet" body="Backing pays to show a message to people outside the creator’s network." action={<Button label="Explore campaigns" onPress={() => router.navigate('/explore')} />} />

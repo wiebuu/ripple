@@ -55,13 +55,14 @@ export default function ReviewQueue() {
       <FlatList
         data={rows}
         keyExtractor={(x) => x.id}
-        contentContainerStyle={{ padding: space.xl, paddingTop: space.sm, gap: space.md }}
+        contentContainerStyle={{ paddingHorizontal: space.xl, paddingTop: space.xs, paddingBottom: space.huge }}
         refreshControl={pull.control()}
         onScroll={pull.onScroll}
         scrollEventThrottle={16}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <CampaignRow
             c={item}
+            divider={index > 0}
             meta={`${STATUS_META[item.status].label}${item.hasPendingRevision ? ' · revision pending' : ''} · ${relTime(item.updatedAt)}`}
             onPress={() => router.push({ pathname: '/review/[id]', params: { id: item.id } })}
             right={item.openReports > 0 ? <Pill label={`${item.openReports} report${item.openReports > 1 ? 's' : ''}`} tone="danger" /> : item.hasPendingRevision ? <Pill label="Edit" tone="warning" /> : undefined}

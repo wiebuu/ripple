@@ -152,7 +152,8 @@ export function SubmitStep({ d, update, errors, onJump }: StepProps & { onJump: 
 function Section({ title, step, children, issues, onJump }: { title: string; step: number; children: React.ReactNode; issues: string[][]; onJump: (s: number) => void }) {
   const { c } = useTheme();
   return (
-    <Card style={{ gap: space.sm, borderColor: issues[step]?.length ? c.warning : c.border }}>
+    // Flat summary blocks split by hairlines, rather than a stack of cards.
+    <View style={{ gap: space.sm, paddingTop: step === 0 ? 0 : space.lg, borderTopWidth: step === 0 ? 0 : 1, borderTopColor: c.border }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <T variant="overline" color="textMuted" style={{ flex: 1 }}>
           {title}
@@ -172,7 +173,7 @@ function Section({ title, step, children, issues, onJump }: { title: string; ste
           </T>
         </View>
       ))}
-    </Card>
+    </View>
   );
 }
 

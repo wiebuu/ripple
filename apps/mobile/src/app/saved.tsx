@@ -19,11 +19,11 @@ export default function Saved() {
       <FlatList
         data={q.data?.items ?? []}
         keyExtractor={(x) => x.id}
-        contentContainerStyle={{ padding: space.xl, gap: space.md }}
+        contentContainerStyle={{ paddingHorizontal: space.xl, paddingTop: space.xs, paddingBottom: space.huge }}
         refreshControl={pull.control()}
         onScroll={pull.onScroll}
         scrollEventThrottle={16}
-        renderItem={({ item }) => <CampaignRow c={item} />}
+        renderItem={({ item, index }) => <CampaignRow c={item} divider={index > 0} />}
         ListEmptyComponent={
           q.isPending ? <RowSkeleton /> : q.isError ? <ErrorState onRetry={() => q.refetch()} /> : (
             <EmptyState icon="bookmark-outline" title="Nothing saved yet" body="Tap the bookmark on any campaign to read it later." action={<Button label="Explore campaigns" onPress={() => router.navigate('/explore')} />} />

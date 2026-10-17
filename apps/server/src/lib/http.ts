@@ -24,6 +24,8 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   if (err instanceof ZodError) {
     return res.status(400).json({ error: 'Invalid request', details: err.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) });
   }
+  // Upload larger than multer's limit: say so instead of a generic error.
+  if ((err as { code?: string })?.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'That file is too large. Videos must be under 50 MB and images under 8 MB.' });
   // Malformed ObjectId in a URL or body: the record can't exist.
   if ((err as { code?: string })?.code === 'P2023') return res.status(404).json({ error: 'Not found' });
   if (err instanceof HttpError) {

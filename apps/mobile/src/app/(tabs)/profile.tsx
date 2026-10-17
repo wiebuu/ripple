@@ -11,6 +11,7 @@ import { useSession } from '@/lib/session';
 import { radius, space, useTheme } from '@/theme';
 import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
 import { PatternScroll, PatternWindow, usePatternScroll } from '@/components/brand/PatternWindow';
+import { StageTrack } from '@/components/StageTrack';
 
 export default function Profile() {
   const { c } = useTheme();
@@ -95,9 +96,6 @@ export default function Profile() {
   );
 }
 
-/** Short labels so all six stages fit on one track. */
-const STAGE_LABEL: Record<string, string> = { drafts: 'Drafts', review: 'In review', action: 'Needs action', funding: 'Funding', promoting: 'Live', completed: 'Done' };
-
 /**
  * "My campaigns" as a journey: the six stages are nodes on one track, so you
  * can see where your campaigns are in the lifecycle at a glance. Tap a stage
@@ -106,7 +104,6 @@ const STAGE_LABEL: Record<string, string> = { drafts: 'Drafts', review: 'In revi
 function CampaignJourney({ counts, loading, needsAction }: { counts: { key: string; label: string; n: number }[]; loading: boolean; needsAction: number }) {
   const { c } = useTheme();
   const total = counts.reduce((a, t) => a + t.n, 0);
-  const NODE = 40;
   return (
     <View style={{ gap: space.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -121,36 +118,7 @@ function CampaignJourney({ counts, loading, needsAction }: { counts: { key: stri
         </Pressable>
       </View>
       <View style={{ paddingTop: space.xs, gap: space.md }}>
-        <View style={{ flexDirection: 'row' }}>
-          {/* The track runs behind the nodes, from the first centre to the last. */}
-          <View style={{ position: 'absolute', top: NODE / 2 - 1, left: `${100 / 12}%`, right: `${100 / 12}%`, height: 2, borderRadius: 1, backgroundColor: c.track }} />
-          {counts.map((t) => {
-            const warn = t.key === 'action' && t.n > 0;
-            const on = t.n > 0;
-            // Filled green = campaigns at this stage; an outlined warning ring = needs you.
-            const fill = warn ? c.warningSoft : on ? c.primary : c.surface;
-            return (
-              <Pressable
-                key={t.key}
-                accessibilityRole="button"
-                accessibilityLabel={`${t.label}: ${t.n}`}
-                onPress={() => {
-                  haptic.light();
-                  router.push({ pathname: '/my-campaigns', params: { tab: t.key } });
-                }}
-                style={({ pressed }) => ({ flex: 1, alignItems: 'center', gap: 6, opacity: pressed ? 0.7 : 1 })}>
-                <View style={{ width: NODE, height: NODE, borderRadius: NODE / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: fill === c.surface ? c.bg : fill, borderWidth: warn ? 2 : on ? 0 : 1.5, borderColor: warn ? c.warning : c.border }}>
-                  <T variant="bodyStrong" style={{ color: warn ? c.warning : on ? c.onPrimary : c.textSubtle, fontVariant: ['tabular-nums'] }}>
-                    {loading ? '–' : t.n}
-                  </T>
-                </View>
-                <T variant="small" center numberOfLines={2} style={{ fontSize: 11, lineHeight: 14, color: warn ? c.warning : on ? c.text : c.textMuted }}>
-                  {STAGE_LABEL[t.key] ?? t.label}
-                </T>
-              </Pressable>
-            );
-          })}
-        </View>
+        <StageTrack counts={counts} loading={loading} onSelect={(key) => router.push({ pathname: '/my-campaigns', params: { tab: key } })} />
         {needsAction > 0 ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.sm, borderRadius: radius.md, backgroundColor: c.warningSoft }}>
             <Icon name="alert-circle-outline" size={16} color={c.warning} />

@@ -2,7 +2,7 @@
  * Demo data. Every seeded campaign is flagged isDemo so the app can label
  * figures as sample data. Run with `npm run seed` (wipes the database).
  */
-import { emptyDraft, feeBreakdown, estimateReach, channelFactor, type DraftContent, type StoryBlock, type CampaignStatus } from '../../../shared';
+import { emptyDraft, feeBreakdown, estimateReach, channelFactor, sampleVideo, type DraftContent, type SampleVideo, type StoryBlock, type CampaignStatus } from '../../../shared';
 import { db } from './lib/db';
 import { simulateDelivery } from './lib/lifecycle';
 
@@ -351,6 +351,17 @@ const seeds: Seed[] = [
   },
 ];
 
+/** Demo campaigns that come with an ad video (free stock clips; see shared/videos.ts). */
+const DEMO_VIDEOS: Record<string, SampleVideo['id']> = {
+  'Redraw the bus network around where people actually work': 'city-train',
+  'Library hours that fit working parents': 'library',
+  'Bring the community theatre back to Main Street': 'friends-table',
+  'Turn one cleanup day into a monthly habit': 'community-hug',
+  'Plant shade trees on the hottest blocks first': 'planting',
+  'Make small-business permits take days, not months': 'laptop',
+  'Clean drinking water in every public school': 'classroom',
+};
+
 async function main() {
   await db.$transaction([
     db.notification.deleteMany(), db.complaint.deleteMany(), db.feedback.deleteMany(), db.follow.deleteMany(), db.save.deleteMany(),
@@ -371,6 +382,8 @@ async function main() {
     const goal = s.goal * INR;
     const raised = s.raised * INR;
     const content: DraftContent = { ...base, ...s.content, goal, acceptedRules: s.status !== 'DRAFT' };
+    const video = DEMO_VIDEOS[content.basics.title];
+    if (video) content.visuals = { ...content.visuals, adVideo: sampleVideo(video).url };
     const live = !['DRAFT', 'SUBMITTED', 'CHANGES_REQUESTED', 'REJECTED'].includes(s.status);
     const publishedAt = live ? new Date(now - (s.publishedDaysAgo ?? 10) * day) : null;
     const submittedAt = s.status !== 'DRAFT' ? new Date((publishedAt?.getTime() ?? now) - 2 * day) : null;

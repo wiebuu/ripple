@@ -7,7 +7,7 @@ import { PostCard, PostDivider, PostSkeleton, SpotlightCard } from '@/components
 import { Sheet } from '@/components/Sheet';
 import { TabHeader } from '@/components/TabHeader';
 import { PatternScroll, PatternWindow, usePatternScroll } from '@/components/brand/PatternWindow';
-import { Button, Chip, EmptyState, ErrorState, Icon, IconButton, T, haptic } from '@/components/ui';
+import { Button, EmptyState, ErrorState, Icon, IconButton, T, haptic, type IconName } from '@/components/ui';
 import { useCollapsingHeader } from '@/hooks/useCollapsingHeader';
 import { useTabReselect } from '@/hooks/useTabReselect';
 import { useCampaigns, useInfiniteCampaigns, type ListParams } from '@/lib/queries';
@@ -15,12 +15,12 @@ import { fonts, radius, space, useTheme } from '@/theme';
 import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
 import { RippleLoader } from '@/components/brand/RippleMark';
 
-const SORTS: { key: NonNullable<ListParams['sort']>; label: string }[] = [
-  { key: 'trending', label: 'Trending' },
-  { key: 'newest', label: 'Newest' },
-  { key: 'closest', label: 'Closest to goal' },
-  { key: 'ending', label: 'Ending soon' },
-  { key: 'most_backed', label: 'Most backed' },
+const SORTS: { key: NonNullable<ListParams['sort']>; label: string; icon: IconName }[] = [
+  { key: 'trending', label: 'Trending', icon: 'stats-chart-outline' },
+  { key: 'newest', label: 'Newest', icon: 'sparkles-outline' },
+  { key: 'closest', label: 'Closest to goal', icon: 'flag-outline' },
+  { key: 'ending', label: 'Ending soon', icon: 'time-outline' },
+  { key: 'most_backed', label: 'Most backed', icon: 'people-outline' },
 ];
 const STATUS: { key: NonNullable<ListParams['status']>; label: string }[] = [
   { key: 'all', label: 'All public' },
@@ -254,24 +254,38 @@ export default function Explore() {
       </PatternScroll>
       </PullArea>
 
-      <Sheet visible={sheet} onClose={() => setSheet(false)} title="Sort & filter" footer={
-        <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <Button label="Reset" variant="secondary" style={{ flex: 1 }} onPress={() => { setSort('trending'); setStatus('all'); setCreatorType(undefined); setMinPct(undefined); }} />
-          <Button label={query.isSuccess ? `Show ${query.total} results` : 'Show results'} style={{ flex: 2 }} onPress={() => setSheet(false)} />
-        </View>
-      }>
+      <Sheet
+        visible={sheet}
+        onClose={() => setSheet(false)}
+        title="Sort & filter"
+        footer={
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+            {(sort !== 'trending' || filterCount > 0) && (
+              <Button label="Reset" variant="ghost" size="sm" onPress={() => { setSort('trending'); setStatus('all'); setCreatorType(undefined); setMinPct(undefined); }} />
+            )}
+            <Button label={query.isSuccess ? `Show ${query.total} result${query.total === 1 ? '' : 's'}` : 'Show results'} style={{ flex: 1 }} onPress={() => setSheet(false)} />
+          </View>
+        }>
         <Group title="Sort by">
-          {SORTS.map((s) => <Chip key={s.key} label={s.label} selected={sort === s.key} onPress={() => setSort(s.key)} />)}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+            {SORTS.map((s, i) => (
+              <SortTile key={s.key} label={s.label} icon={s.icon} selected={sort === s.key} wide={i === SORTS.length - 1 && SORTS.length % 2 === 1} onPress={() => setSort(s.key)} />
+            ))}
+          </View>
         </Group>
         <Group title="Campaign stage">
-          {STATUS.map((s) => <Chip key={s.key} label={s.label} selected={status === s.key} onPress={() => setStatus(s.key)} />)}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+            {STATUS.map((s) => <SoftChip key={s.key} label={s.label} selected={status === s.key} onPress={() => setStatus(s.key)} />)}
+          </View>
         </Group>
         <Group title="Creator type">
-          <Chip label="Any" selected={!creatorType} onPress={() => setCreatorType(undefined)} />
-          {CREATOR_TYPES.map((t) => <Chip key={t} label={t} selected={creatorType === t} onPress={() => setCreatorType(t)} />)}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+            <SoftChip label="Any" selected={!creatorType} onPress={() => setCreatorType(undefined)} />
+            {CREATOR_TYPES.map((t) => <SoftChip key={t} label={t} selected={creatorType === t} onPress={() => setCreatorType(t)} />)}
+          </View>
         </Group>
         <Group title="Funding progress">
-          {[undefined, 25, 50, 75].map((p) => <Chip key={String(p)} label={p ? `${p}%+ funded` : 'Any'} selected={minPct === p} onPress={() => setMinPct(p)} />)}
+          <Segmented options={[{ key: undefined, label: 'Any' }, { key: 25, label: '25%+' }, { key: 50, label: '50%+' }, { key: 75, label: '75%+' }]} value={minPct} onChange={setMinPct} />
         </Group>
       </Sheet>
     </View>
@@ -301,8 +315,100 @@ function CategoryPill({ label, selected, onPress }: { label: string; selected: b
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <View style={{ gap: space.sm }}>
-      <T variant="smallStrong">{title}</T>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>{children}</View>
+      <T variant="overline" color="textMuted">
+        {title}
+      </T>
+      {children}
+    </View>
+  );
+}
+
+/** Sort choice as a small tile: icon over label; the selected one is outlined in green on a soft fill. */
+function SortTile({ label, icon, selected, wide, onPress }: { label: string; icon: IconName; selected: boolean; wide?: boolean; onPress: () => void }) {
+  const { c } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={`Sort by ${label}`}
+      onPress={() => {
+        haptic.light();
+        onPress();
+      }}
+      style={({ pressed }) => ({
+        // Two per row; an odd last tile spans the full width.
+        width: wide ? '100%' : '48.6%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.sm,
+        height: 48,
+        paddingHorizontal: space.md,
+        borderRadius: radius.md,
+        borderWidth: selected ? 1.5 : 1,
+        borderColor: selected ? c.primary : c.border,
+        backgroundColor: selected ? c.primarySoft : c.surface,
+        opacity: pressed ? 0.75 : 1,
+      })}>
+      <Icon name={icon} size={17} color={selected ? c.primary : c.textMuted} />
+      <T variant="small" numberOfLines={1} style={{ flex: 1, fontWeight: selected ? '700' : '500', color: selected ? c.primary : c.text }}>
+        {label}
+      </T>
+    </Pressable>
+  );
+}
+
+/** Light filter chip: outlined, with a soft green fill when selected. */
+function SoftChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  const { c } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={() => {
+        haptic.light();
+        onPress();
+      }}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        height: 34,
+        paddingHorizontal: 14,
+        borderRadius: radius.pill,
+        borderWidth: 1,
+        borderColor: selected ? c.primary : c.border,
+        backgroundColor: selected ? c.primarySoft : c.surface,
+        opacity: pressed ? 0.75 : 1,
+      })}>
+      <T variant="small" style={{ fontWeight: '600', color: selected ? c.primary : c.text }}>
+        {label}
+      </T>
+    </Pressable>
+  );
+}
+
+/** A compact segmented control for a few mutually exclusive values. */
+function Segmented<K>({ options, value, onChange }: { options: { key: K; label: string }[]; value: K; onChange: (k: K) => void }) {
+  const { c } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', padding: 3, borderRadius: radius.md, backgroundColor: c.surfaceAlt }} accessibilityRole="radiogroup">
+      {options.map((o) => {
+        const on = o.key === value;
+        return (
+          <Pressable
+            key={String(o.key)}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: on }}
+            onPress={() => {
+              haptic.light();
+              onChange(o.key);
+            }}
+            style={{ flex: 1, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.surface : 'transparent' }}>
+            <T variant="small" style={{ fontWeight: on ? '700' : '500', color: on ? c.text : c.textMuted }}>
+              {o.label}
+            </T>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }

@@ -1,9 +1,11 @@
 import { useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
-import { CHANNELS } from '@shared';
+import { CHANNELS, PLATFORMS } from '@shared';
+import { AreaChart, BarList } from '@/components/charts';
+import { PLATFORM_LOGOS } from '@/lib/platforms';
 import { Accordion } from '@/components/Accordion';
 import { Body, Header } from '@/components/Screen';
-import { Banner, Card, DemoBadge, Divider, EmptyState, ErrorState, Pill, Skeleton, Stat, T } from '@/components/ui';
+import { Banner, Card, DemoBadge, Divider, EmptyState, ErrorState, Icon, Pill, Skeleton, Stat, T } from '@/components/ui';
 import { formatMoney, formatReach, shortDate } from '@/lib/format';
 import { useReport } from '@/lib/queries';
 import { space, useTheme } from '@/theme';
@@ -34,7 +36,7 @@ export default function Report() {
       </View>
     );
 
-  const { campaign: cp, report: r } = q.data;
+  const { campaign: cp, report: r, isOwner } = q.data;
   if (!r)
     return (
       <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -60,19 +62,32 @@ export default function Report() {
           <Pill label={`${r.startedAt ? shortDate(r.startedAt) : '—'} → ${r.endedAt ? shortDate(r.endedAt) : 'ongoing'}`} tone="neutral" />
         </View>
 
-        <Card style={{ gap: space.md }}>
-          <T variant="overline" color="textMuted">
-            Money
-          </T>
-          <View style={{ flexDirection: 'row' }}>
-            <Stat label="raised from backers" value={formatMoney(r.fundsRaised)} />
-            <Stat label="ad budget" value={formatMoney(r.adBudget)} />
-          </View>
-          <Divider />
-          <Line k="Platform share (review, setup, reporting)" v={formatMoney(r.platformFees, true)} />
-          <Line k={`Spent on ads (${spentPct}% of budget)`} v={formatMoney(r.adSpend, true)} strong />
-          <Line k={r.final ? 'Unspent, refunded to backers' : 'Not yet spent'} v={formatMoney(unspent, true)} />
-        </Card>
+        {isOwner ? (
+          <Card style={{ gap: space.md }}>
+            <T variant="overline" color="textMuted">
+              Money
+            </T>
+            <View style={{ flexDirection: 'row' }}>
+              <Stat label="raised from backers" value={formatMoney(r.fundsRaised)} />
+              <Stat label="ad budget" value={formatMoney(r.adBudget)} />
+            </View>
+            <Divider />
+            <Line k="Platform share (review, setup, reporting)" v={formatMoney(r.platformFees, true)} />
+            <Line k={`Spent on ads (${spentPct}% of budget)`} v={formatMoney(r.adSpend, true)} strong />
+            <Line k={r.final ? 'Unspent, refunded to backers' : 'Not yet spent'} v={formatMoney(unspent, true)} />
+          </Card>
+        ) : (
+          // Backers and visitors get the headline only; the fee breakdown is for the creator.
+          <Card style={{ gap: space.md }}>
+            <T variant="overline" color="textMuted">
+              Backing
+            </T>
+            <View style={{ flexDirection: 'row' }}>
+              <Stat label="raised from backers" value={formatMoney(r.fundsRaised)} />
+              <Stat label="spent on ads so far" value={formatMoney(r.adSpend)} />
+            </View>
+          </Card>
+        )}
 
         <Card style={{ gap: space.md }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -90,6 +105,38 @@ export default function Report() {
             <Stat label="click-through rate" value={`${ctr.toFixed(1)}%`} hint="clicks ÷ impressions" />
           </View>
         </Card>
+
+        {r.daily.length > 1 && (
+          <Card style={{ gap: space.md }}>
+            <T variant="overline" color="textMuted">
+              Impressions per day
+            </T>
+            <AreaChart data={r.daily.map((d) => ({ day: d.day, value: d.impressions }))} unit="impressions" />
+            <T variant="small" color="textMuted">
+              Drag along the chart to see each day.
+            </T>
+          </Card>
+        )}
+
+        {r.byPlatform.length > 0 && (
+          <Card style={{ gap: space.md }}>
+            <T variant="overline" color="textMuted">
+              By app
+            </T>
+            <BarList
+              rows={r.byPlatform.map((p) => {
+                const [logo, brand] = PLATFORM_LOGOS[p.platform];
+                return {
+                  key: p.platform,
+                  label: PLATFORMS.find((x) => x.key === p.platform)?.label ?? p.platform,
+                  leading: <Icon name={logo} size={18} color={brand ?? c.text} />,
+                  value: p.impressions,
+                  sub: `${formatReach(p.clicks)} clicks`,
+                };
+              })}
+            />
+          </Card>
+        )}
 
         <Card style={{ gap: space.md }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -113,12 +160,19 @@ export default function Report() {
             </T>
             {r.byChannel.map((ch) => (
               <View key={ch.channel} style={{ gap: 4 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <T variant="smallStrong">{CHANNELS.find((x) => x.key === ch.channel)?.label ?? ch.channel}</T>
-                  <T variant="small" color="textMuted">
-                    {formatMoney(ch.spend)} · {formatReach(ch.impressions)} impr. · {formatReach(ch.clicks)} clicks
+                {/* Name and spend on one line, the delivery figures on their own line, so nothing has to wrap. */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.md }}>
+                  <T variant="smallStrong" numberOfLines={1} style={{ flexShrink: 1 }}>
+                    {CHANNELS.find((x) => x.key === ch.channel)?.label ?? ch.channel}
+                  </T>
+                  <T variant="smallStrong" style={{ fontVariant: ['tabular-nums'] }}>
+                    {isOwner ? formatMoney(ch.spend) : `${formatReach(ch.impressions)} impr.`}
                   </T>
                 </View>
+                <T variant="small" color="textMuted" style={{ fontSize: 12 }}>
+                  {isOwner ? `${formatReach(ch.impressions)} impressions · ` : ''}
+                  {formatReach(ch.clicks)} clicks
+                </T>
                 <View style={{ height: 6, borderRadius: 3, backgroundColor: c.track }}>
                   <View style={{ height: 6, borderRadius: 3, backgroundColor: c.primary, width: `${(ch.spend / maxSpend) * 100}%` }} />
                 </View>
@@ -131,10 +185,10 @@ export default function Report() {
 
         <Card padded={false} style={{ paddingHorizontal: space.lg }}>
           <Accordion title="What these numbers mean" icon="help-circle-outline" last>
-            <Line k="Impressions" v="Each time the ad appeared on a screen" />
-            <Line k="People reached" v="Unique people who saw it at least once" />
-            <Line k="Clicks" v="Taps from the ad to the campaign story" />
-            <Line k="Estimate" v="Our prediction before launch, from average ad prices" />
+            <Term k="Impressions" v="Each time the ad appeared on a screen." />
+            <Term k="People reached" v="Unique people who saw it at least once." />
+            <Term k="Clicks" v="Taps from the ad through to the campaign story." />
+            <Term k="Estimate" v="Our prediction before launch, from average ad prices. Shown for comparison only, never mixed into measured numbers." />
           </Accordion>
         </Card>
       </Body>
@@ -150,6 +204,18 @@ function Line({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
         {k}
       </T>
       <T variant={strong ? 'smallStrong' : 'small'} style={{ flexShrink: 1, textAlign: 'right' }}>
+        {v}
+      </T>
+    </View>
+  );
+}
+
+/** A glossary entry: the term in bold with its meaning underneath, both left-aligned. */
+function Term({ k, v }: { k: string; v: string }) {
+  return (
+    <View style={{ gap: 2 }}>
+      <T variant="smallStrong">{k}</T>
+      <T variant="small" color="textMuted">
         {v}
       </T>
     </View>

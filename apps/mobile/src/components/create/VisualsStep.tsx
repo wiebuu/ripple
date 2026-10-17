@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import { AD_DESCRIPTION_MAX, AD_HEADLINE_MAX, CTA_MAX, type DraftContent } from '@shared';
+import { SAMPLE_VIDEOS, AD_DESCRIPTION_MAX, AD_HEADLINE_MAX, CTA_MAX, type DraftContent } from '@shared';
 import { pickAndUpload } from '@/lib/media';
 import { toast } from '@/lib/toast';
 import { radius, space, useTheme } from '@/theme';
@@ -9,6 +9,7 @@ import { Field } from '../Field';
 import { Banner, Button, Chip, Icon, IconButton, Pill, T, haptic } from '../ui';
 import { ImageSlot } from './ImageSlot';
 import { FieldError, Label, StepIntro, type StepProps } from './shared';
+import { CampaignVideo } from '../CampaignVideo';
 
 const CTAS = ['Learn more', 'Read the story', 'Have your say', 'See the facts', 'Sign up'];
 const PLACEMENTS = ['Feed', 'Story', 'Search'] as const;
@@ -51,27 +52,54 @@ export function VisualsStep({ d, update, errors }: StepProps) {
             </View>
           ))}
           {v.adImages.length < 6 && (
-            <View style={{ width: 160 }}>
-              <ImageSlot aspect={1} category={d.basics.category} label="Add ad image" onChange={(u) => u && set({ adImages: [...v.adImages, u] })} />
+            <View style={{ width: 120 }}>
+              <ImageSlot compact aspect={1} category={d.basics.category} label="Add image" onChange={(u) => u && set({ adImages: [...v.adImages, u] })} />
             </View>
           )}
         </ScrollView>
-        {!!cover && v.adImages.length === 0 && <Button label="Use the cover image" icon="copy-outline" variant="quiet" size="sm" style={{ alignSelf: 'flex-start' }} onPress={() => set({ adImages: [cover] })} />}
+        {!!cover && v.adImages.length === 0 && <Button label="Use the cover image" icon="copy-outline" variant="ghost" size="sm" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} onPress={() => set({ adImages: [cover] })} />}
         <FieldError error={errors['visuals.adImages']} />
       </View>
 
       <View style={{ gap: space.sm }}>
         <Label text="Video" hint="Optional. MP4 under 50 MB, used for video and stories placements." />
         {v.adVideo ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.md, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border }}>
-            <Icon name="videocam-outline" size={20} color={c.primary} />
-            <T style={{ flex: 1 }} numberOfLines={1}>
-              Video added
-            </T>
-            <IconButton icon="trash-outline" label="Remove video" size={18} onPress={() => set({ adVideo: undefined })} />
+          // The chosen video plays inline, with a remove control on top.
+          <View>
+            <CampaignVideo uri={v.adVideo} />
+            <IconButton icon="trash-outline" label="Remove video" tone="onImage" size={18} style={{ position: 'absolute', top: 8, right: 8 }} onPress={() => set({ adVideo: undefined })} />
           </View>
         ) : (
-          <Button label="Upload a video" icon="videocam-outline" variant="secondary" loading={uploadingVideo} onPress={addVideo} />
+          <>
+            <Button label="Upload your own" icon="videocam-outline" variant="ghost" size="sm" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} loading={uploadingVideo} onPress={addVideo} />
+            <T variant="small" color="textMuted">
+              Or start with a free stock video
+            </T>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
+              {SAMPLE_VIDEOS.map((s) => (
+                <Pressable
+                  key={s.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Use video: ${s.title}`}
+                  onPress={() => {
+                    haptic.light();
+                    set({ adVideo: s.url });
+                    toast('Video added');
+                  }}
+                  style={({ pressed }) => ({ width: 128, gap: 4, opacity: pressed ? 0.7 : 1 })}>
+                  <View>
+                    <Image source={s.thumb} style={{ width: 128, height: 72, borderRadius: radius.sm + 2, backgroundColor: c.skeleton }} contentFit="cover" />
+                    <View style={{ position: 'absolute', top: 24, left: 52, width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon name="play-forward-outline" size={12} color="#fff" />
+                    </View>
+                  </View>
+                  <T variant="small" numberOfLines={1} style={{ fontSize: 12 }}>
+                    {s.title}
+                  </T>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </>
         )}
       </View>
 
@@ -191,7 +219,7 @@ function QualityCheck({ d }: { d: DraftContent }) {
     <View style={{ gap: space.md }}>
       {missing && <Banner tone="warning" icon="warning-outline" body="No advertising image or video yet. Campaigns can’t be distributed without at least one." />}
       {!show ? (
-        <Button label="Get feedback on my ad" icon="sparkles-outline" variant="secondary" onPress={() => { haptic.light(); setShow(true); }} />
+        <Button label="Check my ad" icon="checkmark-done-outline" variant="ghost" size="sm" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} onPress={() => { haptic.light(); setShow(true); }} />
       ) : (
         <View style={{ gap: space.sm }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>

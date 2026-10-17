@@ -1,10 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, ScrollView, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 import { DASHBOARD_TABS } from '@shared';
 import { CampaignRow, RowSkeleton } from '@/components/campaign';
 import { Header } from '@/components/Screen';
-import { Button, Chip, EmptyState, ErrorState, IconButton } from '@/components/ui';
+import { StageTrack } from '@/components/StageTrack';
+import { OwnCampaignSwipe } from '@/components/SwipeAction';
+import { Button, EmptyState, ErrorState, IconButton } from '@/components/ui';
 import { formatReach, relTime, timeLeft } from '@/lib/format';
 import { useMyCampaigns, type MyCampaign } from '@/lib/queries';
 import { space, useTheme } from '@/theme';
@@ -31,23 +33,25 @@ export default function MyCampaigns() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title="My campaigns" right={<IconButton icon="add" label="New campaign" onPress={() => router.navigate('/create')} />} />
-      <View style={{ height: 56 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.xl, gap: space.sm, alignItems: 'center' }}>
-          {DASHBOARD_TABS.map((t) => (
-            <Chip key={t.key} label={t.label} count={items.filter((x) => t.statuses.includes(x.status)).length} selected={tab === t.key} onPress={() => setTab(t.key)} />
-          ))}
-        </ScrollView>
+      {/* Same circle track as Profile, used here to pick the stage. */}
+      <View style={{ paddingHorizontal: space.md, paddingTop: space.xs, paddingBottom: space.md, borderBottomWidth: 1, borderBottomColor: c.border }}>
+        <StageTrack counts={DASHBOARD_TABS.map((t) => ({ ...t, n: items.filter((x) => t.statuses.includes(x.status)).length }))} loading={q.isPending} selected={tab} onSelect={setTab} />
       </View>
       {pull.indicator()}
       <PullArea pull={pull}>
       <FlatList
         data={rows}
         keyExtractor={(x) => x.id}
-        contentContainerStyle={{ padding: space.xl, paddingTop: space.sm, gap: space.md }}
+        contentContainerStyle={{ paddingHorizontal: space.xl, paddingTop: space.xs, paddingBottom: space.huge }}
         refreshControl={pull.control()}
         onScroll={pull.onScroll}
         scrollEventThrottle={16}
-        renderItem={({ item }) => <CampaignRow c={item} meta={meta(item)} onPress={() => router.push({ pathname: '/manage/[id]', params: { id: item.id } })} />}
+        renderItem={({ item, index }) => (
+          // Swipe left on your own campaign to delete a draft or cancel a live one.
+          <OwnCampaignSwipe c={item}>
+            <CampaignRow c={item} divider={index > 0} meta={meta(item)} onPress={() => router.push({ pathname: '/manage/[id]', params: { id: item.id } })} />
+          </OwnCampaignSwipe>
+        )}
         ListEmptyComponent={
           q.isPending ? (
             <RowSkeleton />
