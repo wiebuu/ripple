@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { RefreshControl, View } from 'react-native';
+import { View } from 'react-native';
 import { CHANNELS } from '@shared';
 import { Accordion } from '@/components/Accordion';
 import { Body, Header } from '@/components/Screen';
@@ -7,7 +7,7 @@ import { Banner, Card, DemoBadge, Divider, EmptyState, ErrorState, Pill, Skeleto
 import { formatMoney, formatReach, shortDate } from '@/lib/format';
 import { useReport } from '@/lib/queries';
 import { space, useTheme } from '@/theme';
-import { usePullRefresh } from '@/hooks/usePullRefresh';
+import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
 
 /** Distribution report. Money, measured delivery and the original estimate are kept visibly separate. */
 export default function Report() {
@@ -51,7 +51,9 @@ export default function Report() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title={r.final ? 'Final report' : 'Distribution report'} subtitle={cp.title} />
-      <Body refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}>
+      {pull.indicator()}
+      <PullArea pull={pull}>
+      <Body refreshControl={pull.control()} onScroll={pull.onScroll} scrollEventThrottle={16}>
         <View style={{ flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' }}>
           <Pill label={r.final ? 'Final' : 'In progress'} tone={r.final ? 'success' : 'info'} />
           {cp.isDemo && <DemoBadge />}
@@ -136,6 +138,7 @@ export default function Report() {
           </Accordion>
         </Card>
       </Body>
+      </PullArea>
     </View>
   );
 }

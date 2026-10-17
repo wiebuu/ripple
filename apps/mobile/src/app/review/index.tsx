@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, RefreshControl, ScrollView, View } from 'react-native';
+import { FlatList, ScrollView, View } from 'react-native';
 import { STATUS_META, type CampaignStatus } from '@shared';
 import { CampaignRow, RowSkeleton } from '@/components/campaign';
 import { Header } from '@/components/Screen';
@@ -9,7 +9,7 @@ import { relTime } from '@/lib/format';
 import { useReviewQueue, type ReviewItem } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { space, useTheme } from '@/theme';
-import { usePullRefresh } from '@/hooks/usePullRefresh';
+import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
 
 const GROUPS: { key: string; label: string; match: (x: ReviewItem) => boolean }[] = [
   { key: 'review', label: 'Needs review', match: (x) => x.status === 'SUBMITTED' || x.hasPendingRevision },
@@ -50,11 +50,15 @@ export default function ReviewQueue() {
           ))}
         </ScrollView>
       </View>
+      {pull.indicator()}
+      <PullArea pull={pull}>
       <FlatList
         data={rows}
         keyExtractor={(x) => x.id}
         contentContainerStyle={{ padding: space.xl, paddingTop: space.sm, gap: space.md }}
-        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}
+        refreshControl={pull.control()}
+        onScroll={pull.onScroll}
+        scrollEventThrottle={16}
         renderItem={({ item }) => (
           <CampaignRow
             c={item}
@@ -65,6 +69,7 @@ export default function ReviewQueue() {
         )}
         ListEmptyComponent={q.isPending ? <RowSkeleton /> : q.isError ? <ErrorState message={(q.error as Error).message} onRetry={() => q.refetch()} /> : <EmptyState icon="checkmark-done-outline" title="Nothing here" body="All caught up." />}
       />
+      </PullArea>
     </View>
   );
 }

@@ -34,7 +34,10 @@ export async function api<T = any>(path: string, opts: Opts = {}): Promise<T> {
   try {
     res = await fetch(API_URL + path, {
       method: opts.method ?? (opts.body || opts.form ? 'POST' : 'GET'),
+      // Always ask the server: a refresh must show current data, never an HTTP-cached copy.
+      cache: 'no-store',
       headers: {
+        'cache-control': 'no-cache',
         ...(opts.form ? {} : { 'content-type': 'application/json' }),
         ...(token && { authorization: `Bearer ${token}` }),
       },

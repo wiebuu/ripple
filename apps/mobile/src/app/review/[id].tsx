@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { CHANNELS, COMPLAINT_REASONS, STATUS_META, feeBreakdown, type CampaignStatus, type Complaint, type DraftContent } from '@shared';
 import { Accordion } from '@/components/Accordion';
 import { AdPreview } from '@/components/create/VisualsStep';
@@ -16,7 +16,7 @@ import { invalidateCampaign, useReviewDetail } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { radius, space, useTheme } from '@/theme';
-import { usePullRefresh } from '@/hooks/usePullRefresh';
+import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
 
 type Decision = 'approve' | 'request_changes' | 'reject';
 
@@ -88,7 +88,9 @@ export default function ReviewCampaign() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title="Review campaign" subtitle={STATUS_META[d.status].label} />
-      <Body refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}>
+      {pull.indicator()}
+      <PullArea pull={pull}>
+      <Body refreshControl={pull.control()} onScroll={pull.onScroll} scrollEventThrottle={16}>
         <View style={{ gap: space.sm }}>
           <StatusPill status={d.status} />
           <T variant="title">{d.title || 'Untitled'}</T>
@@ -178,6 +180,7 @@ export default function ReviewCampaign() {
           </Accordion>
         </Card>
       </Body>
+      </PullArea>
 
       <Sheet
         visible={!!decision}

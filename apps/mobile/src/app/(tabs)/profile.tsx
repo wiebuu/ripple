@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useRef } from 'react';
-import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Animated, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DASHBOARD_TABS } from '@shared';
 import { TabHeader } from '@/components/TabHeader';
@@ -9,8 +9,8 @@ import { useTabReselect } from '@/hooks/useTabReselect';
 import { useBacked, useFollowing, useMyCampaigns, useSaved } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { radius, space, useTheme } from '@/theme';
-import { TigerPattern } from '@/components/brand/TigerPattern';
-import { usePullRefresh } from '@/hooks/usePullRefresh';
+import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
+import { PatternScroll, PatternWindow, usePatternScroll } from '@/components/brand/PatternWindow';
 
 export default function Profile() {
   const { c } = useTheme();
@@ -21,7 +21,8 @@ export default function Profile() {
   const saved = useSaved();
   const following = useFollowing();
   const scroll = useRef<ScrollView>(null);
-  const pull = usePullRefresh(() => Promise.all([mine.refetch(), backed.refetch(), saved.refetch(), following.refetch()]));
+  const page = usePatternScroll('y');
+  const pull = usePullRefresh(() => Promise.all([mine.refetch(), backed.refetch(), saved.refetch(), following.refetch()]), page.value);
   const refresh = pull.onRefresh;
   useTabReselect(() => {
     scroll.current?.scrollTo({ y: 0, animated: true });
@@ -35,17 +36,22 @@ export default function Profile() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }}>
-    <ScrollView
+    {pull.indicator()}
+    <PullArea pull={pull}>
+    <PatternScroll axis="y" value={page.value}>
+    <Animated.ScrollView
       ref={scroll}
+      onScroll={page.onScroll}
+      scrollEventThrottle={16}
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: space.xl, paddingTop: 0, gap: space.xl, paddingBottom: space.huge }}
-      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={refresh} tintColor={c.spinner} colors={[c.spinner]} />}>
+      refreshControl={pull.control()}>
       <TabHeader title="Profile" flush>
         <IconButton icon="ellipsis-horizontal" label="Menu: activity, settings, help and sign out" onPress={() => router.push('/menu')} style={{ marginRight: -space.sm }} />
       </TabHeader>
 
       <View style={{ borderRadius: radius.xl, overflow: 'hidden', backgroundColor: c.surface, padding: space.lg, flexDirection: 'row', alignItems: 'center', gap: space.lg, borderWidth: 1, borderColor: c.border }}>
-        <TigerPattern />
+        <PatternWindow />
         <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: c.primary, alignItems: 'center', justifyContent: 'center' }}>
           {guest ? <Icon name="person-outline" size={24} color={c.primary} /> : <T variant="title" color="primary" style={{ fontSize: 20 }}>{initials}</T>}
         </View>
@@ -82,7 +88,9 @@ export default function Profile() {
           { label: 'Saved', icon: 'bookmark-outline', n: saved.data?.items.length, href: '/saved' },
         ]}
       />
-    </ScrollView>
+    </Animated.ScrollView>
+    </PatternScroll>
+    </PullArea>
     </View>
   );
 }
@@ -112,7 +120,7 @@ function CampaignJourney({ counts, loading, needsAction }: { counts: { key: stri
           <Icon name="chevron-forward" size={14} color={c.primary} />
         </Pressable>
       </View>
-      <Card style={{ paddingHorizontal: space.sm, paddingVertical: space.lg, gap: space.md }}>
+      <View style={{ paddingTop: space.xs, gap: space.md }}>
         <View style={{ flexDirection: 'row' }}>
           {/* The track runs behind the nodes, from the first centre to the last. */}
           <View style={{ position: 'absolute', top: NODE / 2 - 1, left: `${100 / 12}%`, right: `${100 / 12}%`, height: 2, borderRadius: 1, backgroundColor: c.track }} />
@@ -131,7 +139,7 @@ function CampaignJourney({ counts, loading, needsAction }: { counts: { key: stri
                   router.push({ pathname: '/my-campaigns', params: { tab: t.key } });
                 }}
                 style={({ pressed }) => ({ flex: 1, alignItems: 'center', gap: 6, opacity: pressed ? 0.7 : 1 })}>
-                <View style={{ width: NODE, height: NODE, borderRadius: NODE / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: fill, borderWidth: warn ? 2 : on ? 0 : 1.5, borderColor: warn ? c.warning : c.border }}>
+                <View style={{ width: NODE, height: NODE, borderRadius: NODE / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: fill === c.surface ? c.bg : fill, borderWidth: warn ? 2 : on ? 0 : 1.5, borderColor: warn ? c.warning : c.border }}>
                   <T variant="bodyStrong" style={{ color: warn ? c.warning : on ? c.onPrimary : c.textSubtle, fontVariant: ['tabular-nums'] }}>
                     {loading ? '–' : t.n}
                   </T>
@@ -144,7 +152,7 @@ function CampaignJourney({ counts, loading, needsAction }: { counts: { key: stri
           })}
         </View>
         {needsAction > 0 ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, marginHorizontal: space.sm, padding: space.sm, borderRadius: radius.md, backgroundColor: c.warningSoft }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.sm, borderRadius: radius.md, backgroundColor: c.warningSoft }}>
             <Icon name="alert-circle-outline" size={16} color={c.warning} />
             <T variant="small" style={{ flex: 1, color: c.warning }}>
               {needsAction} campaign{needsAction > 1 ? 's need' : ' needs'} your attention.
@@ -158,38 +166,37 @@ function CampaignJourney({ counts, loading, needsAction }: { counts: { key: stri
             </T>
           )
         )}
-      </Card>
+      </View>
     </View>
   );
 }
 
-/** "Your activity" as one strip: three columns split by hairlines, each with an icon, count and label. */
+/** "Your activity" as a plain list: one hairline-separated row per collection, no box. */
 function ActivityStrip({ items }: { items: { label: string; icon: IconName; n?: number; href: '/following' | '/backed' | '/saved' }[] }) {
   const { c } = useTheme();
   return (
-    <View style={{ gap: space.md }}>
+    <View style={{ gap: space.xs }}>
       <T variant="heading">Your activity</T>
-      <Card style={{ flexDirection: 'row', padding: 0, overflow: 'hidden' }}>
-        {items.map((it, i) => (
-          <Pressable
-            key={it.label}
-            accessibilityRole="button"
-            accessibilityLabel={`${it.label}: ${it.n ?? 0}`}
-            onPress={() => {
-              haptic.light();
-              router.push(it.href);
-            }}
-            style={({ pressed }) => ({ flex: 1, alignItems: 'center', gap: 4, paddingVertical: space.lg, borderLeftWidth: i ? 1 : 0, borderLeftColor: c.border, backgroundColor: pressed ? c.surfaceAlt : 'transparent' })}>
-            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 2 }}>
-              <Icon name={it.icon} size={18} color={c.primary} weight="duotone" />
-            </View>
-            <T variant="number">{it.n ?? '–'}</T>
-            <T variant="small" color="textMuted">
-              {it.label}
-            </T>
-          </Pressable>
-        ))}
-      </Card>
+      {items.map((it, i) => (
+        <Pressable
+          key={it.label}
+          accessibilityRole="button"
+          accessibilityLabel={`${it.label}: ${it.n ?? 0}`}
+          onPress={() => {
+            haptic.light();
+            router.push(it.href);
+          }}
+          style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 52, borderTopWidth: i ? 1 : 0, borderTopColor: c.border, opacity: pressed ? 0.6 : 1 })}>
+          <Icon name={it.icon} size={20} color={c.primary} weight="duotone" />
+          <T variant="bodyStrong" style={{ flex: 1 }}>
+            {it.label}
+          </T>
+          <T variant="bodyStrong" color="textMuted" style={{ fontVariant: ['tabular-nums'] }}>
+            {it.n ?? '–'}
+          </T>
+          <Icon name="chevron-forward" size={16} color={c.textSubtle} />
+        </Pressable>
+      ))}
     </View>
   );
 }

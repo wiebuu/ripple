@@ -1,9 +1,7 @@
 import { useState, type ReactNode } from 'react';
-import { LayoutAnimation, Platform, Pressable, UIManager, View } from 'react-native';
+import { LayoutAnimation, Pressable, View } from 'react-native';
 import { space, useTheme } from '@/theme';
 import { Divider, Icon, T, type IconName } from './ui';
-
-if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
 
 /** Expandable section for secondary information (use of funds, review process...). */
 export function Accordion({ title, icon, summary, children, initiallyOpen = false, last }: { title: string; icon?: IconName; summary?: string; children: ReactNode; initiallyOpen?: boolean; last?: boolean }) {

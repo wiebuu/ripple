@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { Header } from '@/components/Screen';
 import { CopyValue, TEST_CARD, TEST_OTP, TEST_UPI, type TestMethod, type TestOutcome } from '@/components/RazorpayTestGuide';
@@ -7,6 +7,7 @@ import { Banner, Button, EmptyState, T } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
 import { space, useTheme } from '@/theme';
 import type { PayResult } from '@/lib/backing';
+import { RippleLoader } from '@/components/brand/RippleMark';
 
 type Order = { keyId: string; orderId: string; amount: number; currency: string; campaignTitle: string; receiptEmail: string | null };
 
@@ -130,12 +131,12 @@ export function CheckoutStep({ kid, outcome, method, onBack, onDone }: { kid: st
         <EmptyState icon="alert-circle-outline" title="Couldn’t start Razorpay checkout" body={error} action={<Button label="Go back and try again" variant="secondary" onPress={onBack} />} />
       ) : !order || verifying ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.md }}>
-          <ActivityIndicator color={c.spinner} />
+          <RippleLoader />
           <T color="textMuted">{verifying ? 'Verifying payment…' : 'Creating your order…'}</T>
         </View>
       ) : Platform.OS === 'web' ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.md }}>
-          <ActivityIndicator color={c.spinner} />
+          <RippleLoader />
           <T color="textMuted">Razorpay Checkout is open…</T>
         </View>
       ) : (

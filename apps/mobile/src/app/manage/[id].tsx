@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Platform, RefreshControl, View } from 'react-native';
+import { Alert, Platform, View } from 'react-native';
 import { PUBLIC_STATUSES, STATUS_META, TIMELINE, estimateReach, feeBreakdown, timelineIndex } from '@shared';
 import { Accordion } from '@/components/Accordion';
 import { Field } from '@/components/Field';
@@ -18,7 +18,7 @@ import { useBackOrPush } from '@/lib/nav';
 import { shareCampaign } from '@/lib/share';
 import { toast } from '@/lib/toast';
 import { radius, space, useTheme } from '@/theme';
-import { usePullRefresh } from '@/hooks/usePullRefresh';
+import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
 
 export default function Manage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -51,7 +51,9 @@ export default function Manage() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title="Manage campaign" right={isPublic ? <IconButton icon="share-outline" label="Share campaign" onPress={() => shareCampaign(d)} /> : undefined} />
-      <Body refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}>
+      {pull.indicator()}
+      <PullArea pull={pull}>
+      <Body refreshControl={pull.control()} onScroll={pull.onScroll} scrollEventThrottle={16}>
         <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'center' }}>
           {d.coverImage ? (
             <Image source={d.coverImage} style={{ width: 72, height: 72, borderRadius: radius.md }} contentFit="cover" />
@@ -94,6 +96,7 @@ export default function Manage() {
           </Accordion>
         </Card>
       </Body>
+      </PullArea>
     </View>
   );
 }

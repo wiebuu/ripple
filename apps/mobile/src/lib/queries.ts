@@ -42,6 +42,20 @@ export const useCampaigns = (p: ListParams = {}) =>
 
 export const PAGE_SIZE = 6;
 
+/** Home's two lists, with the same keys Home uses, so it opens with real data after the loading screen. */
+export const HOME_FEED: Omit<ListParams, 'limit'> = { status: 'all', sort: 'trending' };
+export const HOME_FEATURED: ListParams = { featured: true, status: 'all', sort: 'trending' };
+export function prefetchHome() {
+  return Promise.all([
+    queryClient.prefetchInfiniteQuery({
+      queryKey: ['campaigns', 'infinite', HOME_FEED],
+      initialPageParam: 0,
+      queryFn: ({ pageParam }) => api<{ items: CampaignSummary[]; total: number; nextOffset: number | null }>(`/campaigns?${qs({ ...HOME_FEED, limit: PAGE_SIZE, offset: pageParam as number })}`),
+    }),
+    queryClient.prefetchQuery({ queryKey: ['campaigns', HOME_FEATURED], queryFn: () => api<{ items: CampaignSummary[]; total: number }>(`/campaigns?${qs(HOME_FEATURED)}`) }),
+  ]);
+}
+
 /** Paginated campaign list: loads one page at a time as the user scrolls. */
 export function useInfiniteCampaigns(p: Omit<ListParams, 'limit'> = {}) {
   const q = useInfiniteQuery({

@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, RefreshControl, ScrollView, View } from 'react-native';
+import { FlatList, ScrollView, View } from 'react-native';
 import { DASHBOARD_TABS } from '@shared';
 import { CampaignRow, RowSkeleton } from '@/components/campaign';
 import { Header } from '@/components/Screen';
@@ -8,7 +8,7 @@ import { Button, Chip, EmptyState, ErrorState, IconButton } from '@/components/u
 import { formatReach, relTime, timeLeft } from '@/lib/format';
 import { useMyCampaigns, type MyCampaign } from '@/lib/queries';
 import { space, useTheme } from '@/theme';
-import { usePullRefresh } from '@/hooks/usePullRefresh';
+import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
 
 /** Creator dashboard: every campaign by lifecycle stage. */
 export default function MyCampaigns() {
@@ -38,11 +38,15 @@ export default function MyCampaigns() {
           ))}
         </ScrollView>
       </View>
+      {pull.indicator()}
+      <PullArea pull={pull}>
       <FlatList
         data={rows}
         keyExtractor={(x) => x.id}
         contentContainerStyle={{ padding: space.xl, paddingTop: space.sm, gap: space.md }}
-        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}
+        refreshControl={pull.control()}
+        onScroll={pull.onScroll}
+        scrollEventThrottle={16}
         renderItem={({ item }) => <CampaignRow c={item} meta={meta(item)} onPress={() => router.push({ pathname: '/manage/[id]', params: { id: item.id } })} />}
         ListEmptyComponent={
           q.isPending ? (
@@ -54,6 +58,7 @@ export default function MyCampaigns() {
           )
         }
       />
+      </PullArea>
     </View>
   );
 }

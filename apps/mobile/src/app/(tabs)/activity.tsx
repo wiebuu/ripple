@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AppNotification } from '@shared';
 import { TabHeader } from '@/components/TabHeader';
@@ -11,7 +11,8 @@ import { relTime } from '@/lib/format';
 import { queryClient, useNotificationFeed } from '@/lib/queries';
 import { KIND_META } from '@/lib/kinds';
 import { radius, space, useTheme } from '@/theme';
-import { usePullRefresh } from '@/hooks/usePullRefresh';
+import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
+import { RippleLoader } from '@/components/brand/RippleMark';
 
 type Row = { type: 'header'; label: string } | { type: 'item'; n: AppNotification };
 
@@ -42,7 +43,8 @@ export default function Activity() {
   const list = useRef<FlatList<Row>>(null);
   const unread = all.data?.pages[0]?.unread ?? 0;
 
-  const { refreshing, onRefresh: refresh } = usePullRefresh(() => Promise.all([all.refetch(), following.refetch()]));
+  const pull = usePullRefresh(() => Promise.all([all.refetch(), following.refetch()]));
+  const refresh = pull.onRefresh;
   useTabReselect(() => {
     list.current?.scrollToOffset({ offset: 0, animated: true });
     refresh();
@@ -91,13 +93,17 @@ export default function Activity() {
         ))}
       </View>
 
+      {pull.indicator()}
+      <PullArea pull={pull}>
       <FlatList
         ref={list}
         key={tab}
         data={group(feed.items)}
         keyExtractor={(r, i) => (r.type === 'item' ? r.n.id : `h${i}`)}
         contentContainerStyle={{ paddingHorizontal: space.xl, paddingBottom: space.huge }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={c.spinner} colors={[c.spinner]} />}
+        refreshControl={pull.control()}
+        onScroll={pull.onScroll}
+        scrollEventThrottle={16}
         onEndReached={feed.loadMore}
         onEndReachedThreshold={0.5}
         ListHeaderComponent={
@@ -142,8 +148,9 @@ export default function Activity() {
             <EmptyState icon="notifications-outline" title="No notifications yet" body="Back or follow a campaign, or create one, and updates will appear here." />
           )
         }
-        ListFooterComponent={feed.isFetchingNextPage ? <ActivityIndicator color={c.spinner} style={{ padding: space.lg }} /> : null}
+        ListFooterComponent={feed.isFetchingNextPage ? <RippleLoader style={{ padding: space.lg }} /> : null}
       />
+      </PullArea>
     </View>
   );
 }

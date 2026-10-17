@@ -1,12 +1,13 @@
 import { router } from 'expo-router';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
 import type { Contribution } from '@shared';
 import { Header } from '@/components/Screen';
 import { EmptyState, ErrorState, Icon, Pill, Skeleton, T } from '@/components/ui';
 import { formatMoney, shortDate } from '@/lib/format';
 import { useMyContributions } from '@/lib/queries';
 import { radius, space, useTheme } from '@/theme';
-import { usePullRefresh } from '@/hooks/usePullRefresh';
+import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
+import { RippleLoader } from '@/components/brand/RippleMark';
 
 const TONE = { SUCCEEDED: 'success', PENDING: 'warning', FAILED: 'danger', CANCELLED: 'neutral', REFUNDED: 'info' } as const;
 const LABEL = { SUCCEEDED: 'Paid', PENDING: 'Pending', FAILED: 'Failed', CANCELLED: 'Cancelled', REFUNDED: 'Refunded' } as const;
@@ -18,13 +19,17 @@ export default function Payments() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title="Payment history" />
+      {pull.indicator()}
+      <PullArea pull={pull}>
       <FlatList
         data={q.items}
         keyExtractor={(x) => x.id}
         contentContainerStyle={{ padding: space.xl, gap: space.sm }}
         onEndReached={q.loadMore}
         onEndReachedThreshold={0.5}
-        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}
+        refreshControl={pull.control()}
+        onScroll={pull.onScroll}
+        scrollEventThrottle={16}
         renderItem={({ item }) => <PaymentRow k={item} />}
         ListHeaderComponent={
           q.items.length ? (
@@ -33,7 +38,7 @@ export default function Payments() {
             </T>
           ) : null
         }
-        ListFooterComponent={q.isFetchingNextPage ? <ActivityIndicator color={c.spinner} style={{ padding: space.lg }} /> : null}
+        ListFooterComponent={q.isFetchingNextPage ? <RippleLoader style={{ padding: space.lg }} /> : null}
         ListEmptyComponent={
           q.isPending ? (
             <View style={{ gap: space.sm }}>
@@ -46,6 +51,7 @@ export default function Payments() {
           )
         }
       />
+      </PullArea>
     </View>
   );
 }

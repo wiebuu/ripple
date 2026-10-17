@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { emptyDraft } from '@shared';
 import { Footer, Header } from '@/components/Screen';
 import { Banner, Button, Icon, Pill, T, haptic, Toggle } from '@/components/ui';
@@ -10,6 +10,7 @@ import { applySuggestion, askAi, startDraft, type VoiceAnswers } from '@/lib/cre
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { fonts, radius, space, useTheme } from '@/theme';
+import { RippleLoader } from '@/components/brand/RippleMark';
 
 const QUESTIONS: { key: keyof VoiceAnswers; q: string; hint: string; sample: string }[] = [
   {
@@ -66,7 +67,7 @@ export default function VoiceCreate() {
   if (drafting)
     return (
       <View style={{ flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center', gap: space.lg, padding: space.xxl }} accessibilityLiveRegion="polite">
-        <ActivityIndicator size="large" color={c.spinner} />
+        <RippleLoader size={72} />
         <T variant="heading" center>
           Drafting your campaign…
         </T>

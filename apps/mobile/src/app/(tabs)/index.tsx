@@ -1,18 +1,19 @@
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Animated, FlatList, Pressable, RefreshControl, ScrollView, useWindowDimensions, View } from 'react-native';
+import { Animated, FlatList, Pressable, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CATEGORIES, peoplePerHundred } from '@shared';
 import { Wordmark } from '@/components/brand/Logo';
-import { TigerPattern } from '@/components/brand/TigerPattern';
+import { PatternScroll, PatternWindow, usePatternScroll } from '@/components/brand/PatternWindow';
 import { PostCard, PostDivider, PostSkeleton, ReachInfo, SpotlightCard } from '@/components/campaign';
 import { TabHeader } from '@/components/TabHeader';
 import { Button, ErrorState, Icon, IconButton, Skeleton, T, haptic } from '@/components/ui';
 import { useCollapsingHeader } from '@/hooks/useCollapsingHeader';
 import { useTabReselect } from '@/hooks/useTabReselect';
-import { useCampaigns, useInfiniteCampaigns } from '@/lib/queries';
+import { HOME_FEATURED, HOME_FEED, useCampaigns, useInfiniteCampaigns } from '@/lib/queries';
 import { radius, space, useTheme } from '@/theme';
-import { usePullRefresh } from '@/hooks/usePullRefresh';
+import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
+import { RippleLoader } from '@/components/brand/RippleMark';
 
 const STEPS: { who: string; title: string; body: string }[] = [
   { who: 'Creator', title: 'Create', body: 'Write the message and pick who it should reach.' },
@@ -23,12 +24,13 @@ const STEPS: { who: string; title: string; body: string }[] = [
 export default function Home() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const featured = useCampaigns({ featured: true, status: 'all', sort: 'trending' });
-  const feed = useInfiniteCampaigns({ status: 'all', sort: 'trending' });
+  const featured = useCampaigns(HOME_FEATURED);
+  const feed = useInfiniteCampaigns(HOME_FEED);
 
   const list = useRef<FlatList>(null);
   const header = useCollapsingHeader();
-  const { refreshing, onRefresh: refresh } = usePullRefresh(() => Promise.all([feed.refetch(), featured.refetch()]));
+  const pull = usePullRefresh(() => Promise.all([feed.refetch(), featured.refetch()]), header.scrollY);
+  const refresh = pull.onRefresh;
   const padTop = insets.top + header.height;
   useTabReselect(() => {
     list.current?.scrollToOffset({ offset: 0, animated: true });
@@ -45,6 +47,9 @@ export default function Home() {
         </TabHeader>
       </Animated.View>
 
+      {pull.indicator(padTop)}
+      <PullArea pull={pull}>
+      <PatternScroll axis="y" value={header.scrollY}>
       <Animated.FlatList
         ref={list}
         data={feed.items}
@@ -52,7 +57,7 @@ export default function Home() {
         onScroll={header.onScroll}
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingTop: padTop, paddingBottom: space.huge }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={c.spinner} colors={[c.spinner]} progressViewOffset={padTop} />}
+        refreshControl={pull.control(padTop)}
         onEndReached={feed.loadMore}
         onEndReachedThreshold={0.6}
         ListHeaderComponent={<HomeIntro featured={featured} />}
@@ -72,6 +77,8 @@ export default function Home() {
         }
         ListFooterComponent={<HomeFooter loading={feed.isFetchingNextPage} done={!feed.hasNextPage && feed.items.length > 0} pageError={feed.isFetchNextPageError} onRetry={() => feed.fetchNextPage()} />}
       />
+      </PatternScroll>
+      </PullArea>
     </View>
   );
 }
@@ -95,21 +102,22 @@ function Section({ title, action, onAction }: { title: string; action?: string; 
 }
 
 function HomeIntro({ featured }: { featured: ReturnType<typeof useCampaigns> }) {
-  const { c } = useTheme();
+  const { c, dark } = useTheme();
   const { width } = useWindowDimensions();
   const [reachOpen, setReachOpen] = useState(false);
   const spotW = Math.min(width - 64, 320);
+  const chips = usePatternScroll('x');
   return (
     <View style={{ gap: space.xxl }}>
       {/* Hero: compact themed card with the faint swirl pattern */}
       <View style={{ paddingHorizontal: space.lg, paddingTop: space.xs }}>
         <View style={{ borderRadius: radius.xl, overflow: 'hidden', backgroundColor: c.surface, padding: space.lg + 2, gap: space.md, borderWidth: 1, borderColor: c.border }}>
-          <TigerPattern />
+          <PatternWindow />
           <T variant="overline" color="primary">
             Community-funded reach
           </T>
           <T variant="title" style={{ fontSize: 26, lineHeight: 30 }}>
-            Help good messages travel further.
+            Turn one message into a ripple.
           </T>
           <T color="textMuted" style={{ fontSize: 14, lineHeight: 20 }}>
             Back a campaign to show its message to people outside the creator’s network. You fund the reach, not the cause.
@@ -145,7 +153,8 @@ function HomeIntro({ featured }: { featured: ReturnType<typeof useCampaigns> }) 
       {/* Browse by cause: jumps to Explore already filtered */}
       <View style={{ gap: space.md }}>
         <Section title="Browse by cause" />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.xl, gap: 6 }}>
+        <Animated.ScrollView horizontal showsHorizontalScrollIndicator={false} onScroll={chips.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingHorizontal: space.xl, gap: 6 }}>
+          <PatternScroll axis="x" value={chips.value}>
           {CATEGORIES.map((cat) => (
             <Pressable
               key={cat}
@@ -154,11 +163,13 @@ function HomeIntro({ featured }: { featured: ReturnType<typeof useCampaigns> }) 
                 haptic.light();
                 router.navigate({ pathname: '/explore', params: { category: cat } });
               }}
-              style={({ pressed }) => ({ height: 34, paddingHorizontal: 14, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, opacity: pressed ? 0.7 : 1 })}>
+              style={({ pressed }) => ({ height: 34, paddingHorizontal: 14, borderRadius: radius.pill, overflow: 'hidden', justifyContent: 'center', backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, opacity: pressed ? 0.7 : 1 })}>
+              <PatternWindow opacity={dark ? 0.08 : 0.12} />
               <T variant="smallStrong">{cat}</T>
             </Pressable>
           ))}
-        </ScrollView>
+          </PatternScroll>
+        </Animated.ScrollView>
       </View>
 
       {/* Featured */}
@@ -227,7 +238,7 @@ function HomeFooter({ loading, done, pageError, onRetry }: { loading: boolean; d
     <View style={{ paddingHorizontal: space.xl, gap: space.xl, paddingTop: space.sm }}>
       {loading && (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, paddingVertical: space.md }} accessibilityLiveRegion="polite">
-          <ActivityIndicator color={c.spinner} />
+          <RippleLoader />
           <T variant="small" color="textMuted">
             Loading more campaigns…
           </T>
@@ -241,7 +252,7 @@ function HomeFooter({ loading, done, pageError, onRetry }: { loading: boolean; d
       )}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.lg, backgroundColor: c.primarySoft }}>
         <View style={{ flex: 1, gap: 2 }}>
-          <T variant="bodyStrong">Have a message that should travel further?</T>
+          <T variant="bodyStrong">Got a message that should make waves?</T>
           <T variant="small" color="textMuted">
             Create a campaign in five steps.
           </T>

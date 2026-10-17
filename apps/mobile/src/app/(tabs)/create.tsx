@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Animated, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { STATUS_META, STEPS } from '@shared';
 import { CampaignRow, RowSkeleton } from '@/components/campaign';
+import { PatternScroll, PatternWindow, usePatternScroll } from '@/components/brand/PatternWindow';
 import { TabHeader } from '@/components/TabHeader';
 import { Banner, ErrorState, Icon, T, haptic, type IconName } from '@/components/ui';
 import { useTabReselect } from '@/hooks/useTabReselect';
@@ -12,9 +13,8 @@ import { openEditor, startDraft } from '@/lib/create';
 import { relTime } from '@/lib/format';
 import { useMyCampaigns } from '@/lib/queries';
 import { toast } from '@/lib/toast';
-import { TigerPattern } from '@/components/brand/TigerPattern';
 import { radius, space, useTheme } from '@/theme';
-import { usePullRefresh } from '@/hooks/usePullRefresh';
+import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
 
 /**
  * The two ways to start are a matched pair: `pattern` is the surface card with
@@ -35,7 +35,7 @@ function StartOption({ icon, title, body, meta, onPress, loading, look }: { icon
         onPress();
       }}
       style={({ pressed }) => ({ padding: space.xl, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: inv ? c.primary : c.surface, borderWidth: 1, borderColor: c.primary, gap: space.md, opacity: pressed || loading ? 0.85 : 1 })}>
-      <TigerPattern tone={inv ? 'ink' : 'accent'} />
+      <PatternWindow tone={inv ? 'ink' : 'accent'} />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: inv ? c.onPrimary : c.primary, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name={icon} size={24} color={inv ? c.primary : c.onPrimary} weight="duotone" />
@@ -59,12 +59,13 @@ export default function CreateTab() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const mine = useMyCampaigns();
-  const pull = usePullRefresh(mine.refetch);
   const [busy, setBusy] = useState(false);
   const scroll = useRef<ScrollView>(null);
+  const page = usePatternScroll('y');
+  const pull = usePullRefresh(mine.refetch, page.value);
   useTabReselect(() => {
     scroll.current?.scrollTo({ y: 0, animated: true });
-    mine.refetch();
+    pull.onRefresh();
   });
 
   const drafts = (mine.data?.items ?? []).filter((x) => x.status === 'DRAFT' || x.status === 'CHANGES_REQUESTED');
@@ -82,11 +83,16 @@ export default function CreateTab() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }}>
-    <ScrollView
+    {pull.indicator()}
+    <PullArea pull={pull}>
+    <PatternScroll axis="y" value={page.value}>
+    <Animated.ScrollView
       ref={scroll}
+      onScroll={page.onScroll}
+      scrollEventThrottle={16}
       style={{ flex: 1 }}
       contentContainerStyle={{ padding: space.xl, paddingTop: 0, gap: space.xl, paddingBottom: space.huge }}
-      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}>
+      refreshControl={pull.control()}>
       <View>
         <TabHeader title="Start a campaign" flush />
         <T color="textMuted">Share a message you want more people to see. We review it, backers fund the reach, and you get a report of who it reached.</T>
@@ -127,7 +133,9 @@ export default function CreateTab() {
           </View>
         ))}
       </View>
-    </ScrollView>
+    </Animated.ScrollView>
+    </PatternScroll>
+    </PullArea>
     </View>
   );
 }

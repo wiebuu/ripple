@@ -44,6 +44,8 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
+        // Android lifts the tab bar above the keyboard (e.g. typing in Explore's search); keep it out of the way.
+        tabBarHideOnKeyboard: true,
         tabBarActiveTintColor: c.primary,
         tabBarInactiveTintColor: c.textMuted,
         tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.border, paddingTop: 6 },

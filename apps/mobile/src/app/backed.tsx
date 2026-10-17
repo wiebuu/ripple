@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
-import { FlatList, RefreshControl, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 import { CampaignRow, RowSkeleton } from '@/components/campaign';
 import { Header } from '@/components/Screen';
 import { Button, EmptyState, ErrorState } from '@/components/ui';
 import { formatMoney } from '@/lib/format';
 import { useBacked } from '@/lib/queries';
 import { space, useTheme } from '@/theme';
-import { usePullRefresh } from '@/hooks/usePullRefresh';
+import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
 
 export default function Backed() {
   const { c } = useTheme();
@@ -15,11 +15,15 @@ export default function Backed() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title="Backed campaigns" />
+      {pull.indicator()}
+      <PullArea pull={pull}>
       <FlatList
         data={q.data?.items ?? []}
         keyExtractor={(x) => x.id}
         contentContainerStyle={{ padding: space.xl, gap: space.md }}
-        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}
+        refreshControl={pull.control()}
+        onScroll={pull.onScroll}
+        scrollEventThrottle={16}
         renderItem={({ item }) => <CampaignRow c={item} meta={`You contributed ${formatMoney(item.myTotal, true)}`} />}
         ListEmptyComponent={
           q.isPending ? <RowSkeleton /> : q.isError ? <ErrorState onRetry={() => q.refetch()} /> : (
@@ -27,6 +31,7 @@ export default function Backed() {
           )
         }
       />
+      </PullArea>
     </View>
   );
 }

@@ -1,11 +1,12 @@
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { GENERATED_IMAGES, pickAndUpload, unsplash } from '@/lib/media';
 import { toast } from '@/lib/toast';
 import { radius, space, useTheme } from '@/theme';
 import { Sheet } from '../Sheet';
 import { Button, Icon, IconButton, T } from '../ui';
+import { RippleLoader } from '@/components/brand/RippleMark';
 
 /**
  * Image field: upload from the library (validated on device and server) or
@@ -44,7 +45,7 @@ export function ImageSlot({ uri, onChange, category, aspect = 16 / 9, label = 'A
           accessibilityLabel={label}
           onPress={upload}
           style={({ pressed }) => ({ aspectRatio: aspect, borderRadius: radius.md, borderWidth: 1.5, borderStyle: 'dashed', borderColor: c.border, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', gap: 6, opacity: pressed ? 0.7 : 1 })}>
-          {busy ? <ActivityIndicator color={c.spinner} /> : <Icon name="image-outline" size={28} color={c.textMuted} />}
+          {busy ? <RippleLoader /> : <Icon name="image-outline" size={28} color={c.textMuted} />}
           <T variant="smallStrong">{busy ? 'Uploading…' : label}</T>
           <T variant="small" color="textSubtle">
             JPG, PNG or WebP · under 8 MB · at least 600px wide

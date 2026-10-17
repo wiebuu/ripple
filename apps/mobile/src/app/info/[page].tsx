@@ -16,7 +16,7 @@ const f10 = feeBreakdown(500);
 const PAGES: Record<string, Page> = {
   about: {
     title: 'About',
-    intro: 'Ripple is a community-funded media platform. We help important messages travel beyond the networks of the people who create them.',
+    intro: 'Ripple is a community-funded media platform. Like a drop in still water, one message can spread in widening rings: we help important messages ripple out beyond the networks of the people who create them.',
     sections: [
       { heading: 'Why we exist', body: ['Good information often stays inside the circle that already agrees with it. Advertising can reach new people, but it is expensive for individuals and small groups.', 'We let many people chip in small amounts so a reviewed, sourced message can be shown to audiences who would not otherwise see it.'] },
       { heading: 'What we are not', body: ['We are not a donation platform. Contributions pay for distributing a message, not for the cause, person or organisation it describes. Funds are never transferred to creators.'] },

@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { FlatList, RefreshControl, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 import { STATUS_META } from '@shared';
 import { CampaignRow, RowSkeleton } from '@/components/campaign';
 import { Header } from '@/components/Screen';
@@ -8,7 +8,7 @@ import { pct, timeLeft } from '@/lib/format';
 import { useFollowCampaign, useFollowing } from '@/lib/queries';
 import { toast } from '@/lib/toast';
 import { space, useTheme } from '@/theme';
-import { usePullRefresh } from '@/hooks/usePullRefresh';
+import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
 
 /** Campaigns the user follows. Their updates appear in Activity → Following. */
 export default function Following() {
@@ -19,11 +19,15 @@ export default function Following() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title="Following" right={<IconButton icon="notifications-outline" label="Updates from followed campaigns" onPress={() => router.navigate('/activity')} />} />
+      {pull.indicator()}
+      <PullArea pull={pull}>
       <FlatList
         data={q.data?.items ?? []}
         keyExtractor={(x) => x.id}
         contentContainerStyle={{ padding: space.xl, gap: space.md }}
-        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} tintColor={c.spinner} colors={[c.spinner]} />}
+        refreshControl={pull.control()}
+        onScroll={pull.onScroll}
+        scrollEventThrottle={16}
         renderItem={({ item }) => (
           <CampaignRow
             c={item}
@@ -56,6 +60,7 @@ export default function Following() {
           )
         }
       />
+      </PullArea>
     </View>
   );
 }

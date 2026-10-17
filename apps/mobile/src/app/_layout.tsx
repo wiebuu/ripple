@@ -15,7 +15,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LoadingScreen } from '@/components/brand/LoadingScreen';
 import { ToastHost } from '@/components/Toast';
-import { queryClient } from '@/lib/queries';
+import { prefetchHome, queryClient } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { useTheme } from '@/theme';
 
@@ -28,18 +28,29 @@ export default function RootLayout() {
     Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
     Inter_400Regular_Italic, BricolageGrotesque_600SemiBold, BricolageGrotesque_700Bold,
   });
-  // Keep the branded loading screen up briefly so it reads as intentional, not a flash.
-  const [minTimeDone, setMinTimeDone] = useState(false);
-  const ready = (fontsLoaded || !!fontError) && hydrated && minTimeDone;
+  // While the loading screen shows, fetch Home's real content so it opens filled, not into skeletons.
+  // A cap means a slow network never blocks the app.
+  const [homeReady, setHomeReady] = useState(false);
+  const ready = (fontsLoaded || !!fontError) && hydrated && homeReady;
+  // The loading screen leaves at the end of a ripple, so the app never cuts in mid-animation.
+  const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
     // The native splash and LoadingScreen both follow light/dark, so the hand-off is seamless.
     SplashScreen.hideAsync();
-    const t = setTimeout(() => setMinTimeDone(true), 1600);
-    return () => clearTimeout(t);
   }, []);
+  useEffect(() => {
+    if (!hydrated) return;
+    let done = false;
+    const finish = () => {
+      if (!done) setHomeReady((done = true));
+    };
+    prefetchHome().catch(() => {}).then(finish);
+    const cap = setTimeout(finish, 5000);
+    return () => clearTimeout(cap);
+  }, [hydrated]);
 
-  if (!ready) return <LoadingScreen />;
+  if (!ready || !splashDone) return <LoadingScreen ready={ready} onDone={() => setSplashDone(true)} />;
 
   const navTheme = dark ? DarkTheme : DefaultTheme;
   return (

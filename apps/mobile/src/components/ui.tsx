@@ -1,8 +1,8 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator,
   Animated,
+  Easing,
   Platform,
   Pressable,
   StyleSheet,
@@ -15,11 +15,13 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { STATUS_META, type CampaignStatus } from '@shared';
 import type { IconWeight } from 'phosphor-react-native';
 import { radius, shadow, space, type, useTheme, type Colors, type TypeVariant } from '@/theme';
 import { ICONS, type IconName } from './icons';
 import { RippleRings } from './brand/RippleRings';
+import { RippleLoader } from './brand/RippleMark';
 
 export type { IconName };
 
@@ -95,7 +97,7 @@ export function Button({ label, variant = 'primary', size = 'md', icon, iconRigh
       ]}
       {...rest}>
       {loading ? (
-        <ActivityIndicator color={palette.fg} />
+        <RippleLoader size={22} color={palette.fg} />
       ) : (
         <>
           {icon && <Icon name={icon} size={size === 'sm' ? 15 : 17} color={palette.fg} />}
@@ -220,20 +222,37 @@ export function Divider({ style }: { style?: StyleProp<ViewStyle> }) {
   return <View style={[{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }, style]} />;
 }
 
-export function Skeleton({ h = 16, w = '100%', r = 6, style }: { h?: number; w?: number | `${number}%`; r?: number; style?: StyleProp<ViewStyle> }) {
-  const { c } = useTheme();
-  const o = useState(() => new Animated.Value(0.5))[0];
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(o, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(o, { toValue: 0.5, duration: 700, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [o]);
-  return <Animated.View accessibilityLabel="Loading" style={[{ height: h, width: w, borderRadius: r, backgroundColor: c.skeleton, opacity: o }, style]} />;
+/** One shared sweep so every placeholder on screen shimmers in step. */
+const SHIMMER = new Animated.Value(0);
+let shimmerStarted = false;
+function startShimmer() {
+  if (shimmerStarted) return;
+  shimmerStarted = true;
+  Animated.loop(Animated.timing(SHIMMER, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.quad), useNativeDriver: true })).start();
+}
+
+/** Placeholder block: soft, rounded, with a light sweep passing over it. */
+export function Skeleton({ h = 16, w = '100%', r, style }: { h?: number; w?: number | `${number}%`; r?: number; style?: StyleProp<ViewStyle> }) {
+  const { c, dark } = useTheme();
+  const [width, setWidth] = useState(0);
+  useEffect(startShimmer, []);
+  const band = Math.max(80, width * 0.6);
+  const x = SHIMMER.interpolate({ inputRange: [0, 1], outputRange: [-band, width + band] });
+  const glow = dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.65)';
+  const clear = 'rgba(255,255,255,0)';
+  return (
+    <View
+      accessibilityLabel="Loading"
+      onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}
+      // Lines are pills; larger blocks get the app's card rounding.
+      style={[{ height: h, width: w, borderRadius: r ?? Math.min(radius.md, h / 2), backgroundColor: c.skeleton, overflow: 'hidden' }, style]}>
+      {width > 0 && (
+        <Animated.View style={{ position: 'absolute', top: 0, bottom: 0, width: band, transform: [{ translateX: x }] }}>
+          <LinearGradient colors={[clear, glow, clear]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={{ flex: 1 }} />
+        </Animated.View>
+      )}
+    </View>
+  );
 }
 
 export function EmptyState({ icon = 'leaf-outline', title, body, action }: { icon?: IconName; title: string; body?: string; action?: ReactNode }) {
@@ -242,9 +261,7 @@ export function EmptyState({ icon = 'leaf-outline', title, body, action }: { ico
     <View style={{ alignItems: 'center', paddingVertical: space.xxxl, paddingHorizontal: space.xl, gap: space.sm }}>
       <View style={{ width: 96, height: 96, alignItems: 'center', justifyContent: 'center' }}>
         <RippleRings size={96} color={c.primary} rings={3} style={{ position: 'absolute', opacity: 0.5 }} />
-        <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name={icon} size={22} color={c.textMuted} weight="duotone" />
-        </View>
+        <Icon name={icon} size={26} color={c.primary} weight="regular" />
       </View>
       <T variant="subheading" center>
         {title}

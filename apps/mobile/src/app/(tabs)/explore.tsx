@@ -1,17 +1,19 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, FlatList, Pressable, RefreshControl, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
+import { Animated, FlatList, Pressable, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CATEGORIES, CREATOR_TYPES } from '@shared';
 import { PostCard, PostDivider, PostSkeleton, SpotlightCard } from '@/components/campaign';
 import { Sheet } from '@/components/Sheet';
 import { TabHeader } from '@/components/TabHeader';
+import { PatternScroll, PatternWindow, usePatternScroll } from '@/components/brand/PatternWindow';
 import { Button, Chip, EmptyState, ErrorState, Icon, IconButton, T, haptic } from '@/components/ui';
 import { useCollapsingHeader } from '@/hooks/useCollapsingHeader';
 import { useTabReselect } from '@/hooks/useTabReselect';
 import { useCampaigns, useInfiniteCampaigns, type ListParams } from '@/lib/queries';
 import { fonts, radius, space, useTheme } from '@/theme';
-import { usePullRefresh } from '@/hooks/usePullRefresh';
+import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
+import { RippleLoader } from '@/components/brand/RippleMark';
 
 const SORTS: { key: NonNullable<ListParams['sort']>; label: string }[] = [
   { key: 'trending', label: 'Trending' },
@@ -37,11 +39,12 @@ function useDebounced<T>(v: T, ms = 300) {
 }
 
 export default function Explore() {
-  const { c } = useTheme();
+  const { c, dark } = useTheme();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ category?: string; focus?: string }>();
   const searchRef = useRef<TextInput>(null);
   const [q, setQ] = useState('');
+  const chips = usePatternScroll('x');
   const [searchOpen, setSearchOpen] = useState(!!params.focus);
   const closeSearch = () => {
     setQ('');
@@ -82,9 +85,10 @@ export default function Explore() {
     setMinPct(undefined);
   };
   const sortLabel = useMemo(() => SORTS.find((s) => s.key === sort)!.label, [sort]);
-  const { refreshing, onRefresh: refresh } = usePullRefresh(() => Promise.all([query.refetch(), featured.refetch()]));
   const list = useRef<FlatList>(null);
   const header = useCollapsingHeader();
+  const pull = usePullRefresh(() => Promise.all([query.refetch(), featured.refetch()]), header.scrollY);
+  const refresh = pull.onRefresh;
   const padTop = insets.top + header.height;
   useTabReselect(() => {
     list.current?.scrollToOffset({ offset: 0, animated: true });
@@ -142,14 +146,19 @@ export default function Explore() {
             </View>
           </View>
         )}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.xl, paddingTop: space.md, paddingBottom: space.sm, gap: 6 }}>
+        <Animated.ScrollView horizontal showsHorizontalScrollIndicator={false} onScroll={chips.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingHorizontal: space.xl, paddingTop: space.md, paddingBottom: space.sm, gap: 6 }}>
+          <PatternScroll axis="x" value={chips.value}>
           <CategoryPill label="All" selected={!category} onPress={() => setCategory(undefined)} />
           {CATEGORIES.map((cat) => (
             <CategoryPill key={cat} label={cat} selected={category === cat} onPress={() => setCategory(category === cat ? undefined : cat)} />
           ))}
-        </ScrollView>
+          </PatternScroll>
+        </Animated.ScrollView>
       </Animated.View>
 
+      {pull.indicator(padTop)}
+      <PullArea pull={pull}>
+      <PatternScroll axis="y" value={header.scrollY}>
       <Animated.FlatList
         ref={list}
         data={query.items}
@@ -161,7 +170,7 @@ export default function Explore() {
         keyboardDismissMode="on-drag"
         onEndReached={query.loadMore}
         onEndReachedThreshold={0.6}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={c.spinner} colors={[c.spinner]} progressViewOffset={padTop} />}
+        refreshControl={pull.control(padTop)}
         renderItem={({ item }) => <PostCard c={item} />}
         ListHeaderComponent={
           <View style={{ gap: space.lg }}>
@@ -194,7 +203,8 @@ export default function Explore() {
                 accessibilityLabel={`Sorted by ${sortLabel}. Change sort and filters`}
                 onPress={() => setSheet(true)}
                 hitSlop={6}
-                style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, height: 32, paddingHorizontal: 12, borderRadius: radius.pill, borderWidth: 1, borderColor: c.border, opacity: pressed ? 0.7 : 1 })}>
+                style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, height: 32, paddingHorizontal: 12, borderRadius: radius.pill, overflow: 'hidden', borderWidth: 1, borderColor: c.border, opacity: pressed ? 0.7 : 1 })}>
+                <PatternWindow opacity={dark ? 0.07 : 0.1} />
                 <T variant="smallStrong">{sortLabel}</T>
                 <Icon name="chevron-down" size={13} color={c.textMuted} />
               </Pressable>
@@ -204,7 +214,7 @@ export default function Explore() {
         ListFooterComponent={
           query.isFetchingNextPage ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, paddingVertical: space.xl }} accessibilityLiveRegion="polite">
-              <ActivityIndicator color={c.spinner} />
+              <RippleLoader />
               <T variant="small" color="textMuted">
                 Loading more campaigns…
               </T>
@@ -241,6 +251,8 @@ export default function Explore() {
           )
         }
       />
+      </PatternScroll>
+      </PullArea>
 
       <Sheet visible={sheet} onClose={() => setSheet(false)} title="Sort & filter" footer={
         <View style={{ flexDirection: 'row', gap: space.sm }}>
@@ -268,7 +280,7 @@ export default function Explore() {
 
 /** Compact category filter: green when selected, quiet outline otherwise. */
 function CategoryPill({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
-  const { c } = useTheme();
+  const { c, dark } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -277,7 +289,8 @@ function CategoryPill({ label, selected, onPress }: { label: string; selected: b
         haptic.light();
         onPress();
       }}
-      style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: selected ? c.primary : 'transparent', borderWidth: 1, borderColor: selected ? c.primary : c.border, opacity: pressed ? 0.75 : 1 })}>
+      style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, borderRadius: radius.pill, overflow: 'hidden', justifyContent: 'center', backgroundColor: selected ? c.primary : 'transparent', borderWidth: 1, borderColor: selected ? c.primary : c.border, opacity: pressed ? 0.75 : 1 })}>
+      {!selected && <PatternWindow opacity={dark ? 0.07 : 0.1} />}
       <T variant="smallStrong" style={{ color: selected ? c.onPrimary : c.textMuted }}>
         {label}
       </T>
