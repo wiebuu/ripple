@@ -94,29 +94,62 @@ function clamp(s: Suggestion): Suggestion {
   };
 }
 
+/** Whole-word keywords per category; the category with the most matches wins. */
 const KEYWORDS: [RegExp, (typeof CATEGORIES)[number]][] = [
-  [/climate|tree|river|pollut|recycl|compost|solar|green|wildlife|ocean|beach/i, 'Environment'],
-  [/health|clinic|hospital|mental|water|food|nutrition|disease|doctor/i, 'Health'],
-  [/school|student|teacher|library|education|learn|literacy/i, 'Education'],
-  [/research|science|data|sensor|study|lab/i, 'Science'],
-  [/tax|wage|job|econom|housing|rent|price/i, 'Economic Policy'],
-  [/law|bill|council|vote|policy|transit|bus|zoning|city hall/i, 'Public Policy'],
-  [/art|music|theatre|theater|mural|culture|festival/i, 'Arts & Culture'],
-  [/business|shop|store|startup|merchant|customer/i, 'Business'],
-  [/neighbo|community|shelter|volunteer|local/i, 'Community'],
+  [/\b(climate|trees?|rivers?|pollution|recycl\w*|compost|solar|green|wildlife|oceans?|beach(es)?)\b/gi, 'Environment'],
+  [/\b(health|clinics?|hospitals?|mental|drinking water|food|nutrition|disease|doctors?)\b/gi, 'Health'],
+  [/\b(schools?|students?|teachers?|library|libraries|education|learn\w*|literacy)\b/gi, 'Education'],
+  [/\b(research|science|data|sensors?|study|studies|labs?)\b/gi, 'Science'],
+  [/\b(tax\w*|wages?|jobs?|economy|economic|housing|rent|prices?)\b/gi, 'Economic Policy'],
+  [/\b(laws?|bills?|council|votes?|voting|policy|transit|bus(es)?|zoning|city hall)\b/gi, 'Public Policy'],
+  [/\b(art|arts|music|theatre|theater|murals?|culture|festivals?)\b/gi, 'Arts & Culture'],
+  [/\b(business(es)?|shops?|stores?|startups?|merchants?|customers?|clients?|founders?|brand|products?|services|agency|agencies|software|apps?|websites?|saas)\b/gi, 'Business'],
+  [/\b(neighbo\w+|community|shelters?|volunteers?|local)\b/gi, 'Community'],
 ];
 
-const firstSentence = (s: string) => (s.split(/(?<=[.!?])\s/)[0] ?? '').trim();
+const INTERESTS: Partial<Record<(typeof CATEGORIES)[number], string[]>> = {
+  Environment: ['Environment', 'Sustainability'],
+  Health: ['Health', 'Parenting'],
+  Education: ['Education', 'Parenting'],
+  Science: ['Science', 'Technology'],
+  'Economic Policy': ['Personal finance', 'Local news'],
+  'Public Policy': ['Local news', 'Civic engagement'],
+  'Arts & Culture': ['Arts', 'Music'],
+  Business: ['Small business', 'Technology'],
+  Community: ['Volunteering', 'Local news'],
+};
+
+const sentences = (s: string) => s.split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** Shortens at a word boundary (never mid-word) and drops trailing punctuation or joining words. */
+function clip(s: string, max: number) {
+  const t = s.replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t.replace(/[,;:]$/, '');
+  return t.slice(0, max + 1).replace(/\s+\S*$/, '').replace(/[\s,;:–-]+(and|or|but|so|to|of|the|a|an|for|with|in)?$/i, '').replace(/[,;:]$/, '');
+}
+/** A headline-sized version: drops parentheses, then prefers ending at a clause before cutting words. */
+function headlineFrom(text: string, max: number) {
+  const t = cap(text.replace(/\s*\([^)]*\)/g, '').replace(/^(i want to|we want to|i'd like to|this campaign is about|it's about)\s+/i, '').replace(/[.!?]$/, '').trim());
+  if (t.length <= max) return t;
+  const clause = t.split(/,\s|\s(?:and|so|because|but|which|who)\s/)[0];
+  return clause.length >= 12 && clause.length <= max ? clause : clip(t, max);
+}
+/** Place names listed in parentheses, e.g. "in India (Delhi NCR, Pune, Mumbai)". */
+function placesFrom(text: string) {
+  const list = text.match(/\(([^)]+)\)/)?.[1];
+  return list && list.includes(',') ? list.split(',').map((x) => x.trim()).filter((x) => /^[A-Z]/.test(x)).slice(0, 8) : [];
+}
 
 /** Deterministic, offline stand-in that restructures the creator's own words. */
 export function demoSuggestion({ answers: a }: z.infer<typeof Input>): Suggestion {
   const all = `${a.about} ${a.audience} ${a.why} ${a.evidence}`;
-  const category = KEYWORDS.find(([re]) => re.test(all))?.[1] ?? 'Other';
-  const lead = firstSentence(a.about) || 'A message worth hearing';
-  let title = cap(lead.replace(/^(i want to|we want to|i'd like to|this campaign is about|it's about)\s+/i, '').replace(/[.!?]$/, ''));
-  if (title.length > TITLE_MAX) title = title.slice(0, TITLE_MAX - 1).replace(/\s+\S*$/, '') + '…';
-  const summary = (firstSentence(a.why) || firstSentence(a.about)).slice(0, 200);
+  const scored = KEYWORDS.map(([re, cat]) => [cat, all.match(re)?.length ?? 0] as const).sort((x, y) => y[1] - x[1]);
+  const category = scored[0][1] > 0 ? scored[0][0] : 'Other';
+  const about = sentences(a.about);
+  const lead = about[0] || 'A message worth hearing';
+  const title = headlineFrom(lead, TITLE_MAX);
+  // The summary explains the stakes: "why" if given, otherwise the rest of the description.
+  const summary = clip(sentences(a.why)[0] || about[1] || lead, 200);
   return {
     title,
     category,
@@ -134,10 +167,10 @@ export function demoSuggestion({ answers: a }: z.infer<typeof Input>): Suggestio
       ...(a.evidence.trim() ? [{ title: 'Link to the evidence you mentioned', why: 'Attach the report, study or article you described.' }] : []),
     ],
     actions: ['Share this campaign with one person outside your usual circle', 'Read the sources and decide for yourself'],
-    adHeadline: title.slice(0, 40),
-    adDescription: summary.slice(0, 125),
-    ctaText: 'Learn more',
-    locations: [],
-    interests: [],
+    adHeadline: headlineFrom(lead, 40),
+    adDescription: clip(summary, 125),
+    ctaText: category === 'Business' ? 'Learn more' : category === 'Public Policy' ? 'Have your say' : 'Read the story',
+    locations: placesFrom(a.audience),
+    interests: INTERESTS[category] ?? [],
   };
 }

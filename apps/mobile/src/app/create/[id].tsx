@@ -160,8 +160,8 @@ export default function CampaignEditor() {
         onBack={back}
         right={
           <View style={{ flexDirection: 'row' }}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Auto-fill" hitSlop={8} onPress={() => setAiOpen(true)} style={({ pressed }) => ({ height: 44, paddingHorizontal: 6, justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
-              <AiBadge large />
+            <Pressable accessibilityRole="button" accessibilityLabel="Auto-fill" hitSlop={8} onPress={() => setAiOpen(true)} style={({ pressed }) => ({ height: 44, paddingHorizontal: 4, justifyContent: 'center', opacity: pressed ? 0.75 : 1 })}>
+              <AiBadge large solid />
             </Pressable>
             <IconButton icon="eye-outline" label="Preview campaign" onPress={() => router.push({ pathname: '/create/preview/[id]', params: { id } })} />
           </View>

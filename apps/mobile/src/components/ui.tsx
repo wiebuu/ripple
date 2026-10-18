@@ -18,7 +18,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { STATUS_META, type CampaignStatus } from '@shared';
 import type { IconWeight } from 'phosphor-react-native';
-import { radius, shadow, space, type, useTheme, type Colors, type TypeVariant } from '@/theme';
+import { fonts, radius, shadow, space, type, useTheme, type Colors, type TypeVariant } from '@/theme';
 import { ICONS, type IconName } from './icons';
 import { RippleRings } from './brand/RippleRings';
 import { RippleLoader } from './brand/RippleMark';
@@ -174,22 +174,36 @@ export function Chip({ label, selected, onPress, icon, count }: { label: string;
   );
 }
 
-/** The app's marker for auto-fill and suggestion features: the word "Auto" in a small tinted badge. */
-export function AiBadge({ large, onImage }: { large?: boolean; onImage?: boolean }) {
+/**
+ * The app's marker for auto-fill and suggestion features: the word "Auto" in a
+ * small badge. `solid` is the tappable version (editor header): filled green so
+ * it reads clearly in light and dark mode. Uses the real bold font face, since
+ * Android can't synthesise heavier weights of a custom font and clips tight lines.
+ */
+export function AiBadge({ large, onImage, solid }: { large?: boolean; onImage?: boolean; solid?: boolean }) {
   const { c } = useTheme();
+  const bg = solid ? c.primary : onImage ? 'rgba(0,0,0,0.55)' : c.primarySoft;
+  const fg = solid ? c.onPrimary : onImage ? '#fff' : c.primary;
   return (
     <View
       style={{
-        height: large ? 28 : 20,
-        paddingHorizontal: large ? 10 : 6,
-        borderRadius: large ? 14 : 6,
+        height: large ? 30 : 20,
+        paddingHorizontal: large ? 12 : 7,
+        borderRadius: large ? 15 : 6,
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: onImage ? 'rgba(0,0,0,0.55)' : c.primarySoft,
-        borderWidth: onImage ? 0 : 1,
+        gap: 4,
+        backgroundColor: bg,
+        borderWidth: solid || onImage ? 0 : 1,
         borderColor: c.primary,
       }}>
-      <T style={{ fontSize: large ? 13 : 11, lineHeight: large ? 16 : 13, fontWeight: '800', letterSpacing: 0.6, color: onImage ? '#fff' : c.primary }}>Auto</T>
+      {solid && <Icon name="flash" size={13} color={fg} />}
+      <RNText
+        allowFontScaling={false}
+        style={{ fontFamily: fonts.sansBold, fontSize: large ? 13 : 11, letterSpacing: 0.3, color: fg, includeFontPadding: false, textAlignVertical: 'center' }}>
+        Auto
+      </RNText>
     </View>
   );
 }

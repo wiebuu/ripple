@@ -100,7 +100,7 @@ export default function CreateTab() {
       </View>
 
       <StartOption look="pattern" icon="create-outline" title="Create manually" body="A guided editor with tips at every step and a full preview before you submit." meta={`5 steps · ${STEPS.join(' → ')}`} onPress={manual} loading={busy} />
-      <StartOption look="inverse" icon="mic-outline" title="Create with your voice" body="Answer four short questions out loud. We turn your answers into a draft you can edit." meta="About 3 minutes · works with your keyboard’s dictation" onPress={() => router.push('/create/voice')} />
+      <StartOption look="inverse" icon="flash" title="Quick draft" body="Answer four short questions, typed or spoken, and get a full first draft: title, story outline, ad copy and audience." meta="About 2 minutes · review it before anything is saved" onPress={() => router.push('/create/quick')} />
 
       <View style={{ gap: space.xs }}>
         <T variant="heading">Your drafts</T>
