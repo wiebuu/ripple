@@ -1,5 +1,6 @@
 import { useState, type Ref } from 'react';
-import { TextInput, View, type TextInputProps } from 'react-native';
+import { Animated, TextInput, View, type TextInputProps } from 'react-native';
+import { useErrorAnchor } from './ErrorFocus';
 import { fonts, radius, space, useTheme } from '@/theme';
 import { Icon, T } from './ui';
 
@@ -22,8 +23,10 @@ export function Field({ label, required, helper, error, max, softMax, hideLabel,
   const [focused, setFocused] = useState(false);
   const len = value?.length ?? 0;
   const over = max != null && len > max;
+  // While this field shows an error, a failed Next/Submit can scroll here and shake it.
+  const [anchorRef, shakeX] = useErrorAnchor(error);
   return (
-    <View style={{ gap: 6 }}>
+    <Animated.View ref={anchorRef} collapsable={false} style={{ gap: 6, transform: [{ translateX: shakeX }] }}>
       <View style={{ flexDirection: 'row', justifyContent: hideLabel ? 'flex-end' : 'space-between', alignItems: 'baseline', display: hideLabel && (max == null || len <= max * 0.8) ? 'none' : 'flex' }}>
         {!hideLabel && <T variant="smallStrong">
           {label}
@@ -83,6 +86,6 @@ export function Field({ label, required, helper, error, max, softMax, hideLabel,
           {helper}
         </T>
       ) : null}
-    </View>
+    </Animated.View>
   );
 }

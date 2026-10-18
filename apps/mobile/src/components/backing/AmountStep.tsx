@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { BACKABLE_STATUSES, REACH_CONFIG, estimateReach, feeBreakdown, validateContributionAmount } from '@shared';
 import { BackingHeader } from '@/components/BackingHeader';
+import { ErrorScope, useErrorFocus } from '@/components/ErrorFocus';
 import { Field } from '@/components/Field';
 import { Body, Header } from '@/components/Screen';
 import { Banner, Button, Card, Icon, ProgressBar, T, haptic, Toggle } from '@/components/ui';
@@ -21,6 +22,8 @@ export function AmountStep({ d, onBack, onContinue }: { d: Detail; onBack: () =>
   const user = useSession((s) => s.user);
   const [input, setInput] = useState(b.amount ? String(b.amount) : '');
   const [touched, setTouched] = useState(false);
+  const scroll = useRef<ScrollView>(null);
+  const errorFocus = useErrorFocus(scroll);
 
   const amount = Number(input || 0);
   const remaining = Math.max(0, d.goal - d.raised);
@@ -53,19 +56,25 @@ export function AmountStep({ d, onBack, onContinue }: { d: Detail; onBack: () =>
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Header title="Back this campaign" onBack={onBack} />
       <Body
+        scrollRef={scroll}
+        onScroll={errorFocus.onScroll}
+        scrollEventThrottle={32}
         footer={
           <Button
             label={valid ? `Continue with ${formatMoney(amount)}` : 'Enter an amount'}
             size="lg"
-            disabled={!valid || !!nameError || closed}
+            disabled={!valid || closed}
             onPress={() => {
               setTouched(true);
-              if (!valid || nameError) return;
+              // Left "Name to show" empty: take them to it rather than leaving the button greyed out.
+              if (nameError) return errorFocus.focusFirst();
+              if (!valid) return;
               b.set({ amount });
               onContinue();
             }}
           />
         }>
+        <ErrorScope registry={errorFocus.registry}>
         <BackingHeader c={d} step={0} />
         {closed && <Banner tone="warning" icon="lock-closed-outline" body="This campaign isn’t accepting contributions right now." />}
 
@@ -201,6 +210,7 @@ export function AmountStep({ d, onBack, onContinue }: { d: Detail; onBack: () =>
         )}
 
         <Banner tone="accent" icon="information-circle-outline" body="This is not a donation to the cause. Your contribution pays to show this message to more people." />
+        </ErrorScope>
       </Body>
     </View>
   );

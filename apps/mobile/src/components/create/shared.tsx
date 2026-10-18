@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Animated, Pressable, View } from 'react-native';
+import { useErrorAnchor } from '../ErrorFocus';
 import { STEP_SHORT, STEPS, type DraftContent, type Errors } from '@shared';
 import type { SaveState } from '@/lib/draft';
 import { relTime } from '@/lib/format';
@@ -94,14 +95,16 @@ export function Tip({ children }: { children: string }) {
 
 export function FieldError({ error }: { error?: string }) {
   const { c } = useTheme();
+  // Errors under chips, images and lists are places a failed Next/Submit scrolls to as well.
+  const [anchorRef, shakeX] = useErrorAnchor(error);
   if (!error) return null;
   return (
-    <View style={{ flexDirection: 'row', gap: 6 }} accessibilityLiveRegion="polite">
+    <Animated.View ref={anchorRef} collapsable={false} style={{ flexDirection: 'row', gap: 6, transform: [{ translateX: shakeX }] }} accessibilityLiveRegion="polite">
       <Icon name="alert-circle" size={15} color={c.danger} style={{ marginTop: 2 }} />
       <T variant="small" color="danger" style={{ flex: 1 }}>
         {error}
       </T>
-    </View>
+    </Animated.View>
   );
 }
 

@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode, type Ref } from 'react';
 import { Keyboard, Platform, ScrollView, View, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
 import { GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,12 +44,22 @@ export function Body({
   style,
   footer,
   scrollGesture,
+  scrollRef,
   ...rest
-}: ScrollViewProps & { children: ReactNode; style?: StyleProp<ViewStyle>; footer?: ReactNode; /** Registers the scroll view with a pull-to-refresh gesture (see PullArea). */ scrollGesture?: GestureType }) {
+}: ScrollViewProps & {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  footer?: ReactNode;
+  /** Registers the scroll view with a pull-to-refresh gesture (see PullArea). */
+  scrollGesture?: GestureType;
+  /** The inner ScrollView, e.g. for useErrorFocus. */
+  scrollRef?: Ref<ScrollView>;
+}) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const scroll = (
     <ScrollView
+      ref={scrollRef}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={[{ padding: space.xl, gap: space.xl, paddingBottom: footer ? space.xl : insets.bottom + space.xxxl }, style]}
       {...rest}>

@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { View } from 'react-native';
+import { useRef, useState } from 'react';
+import { ScrollView, View } from 'react-native';
 import type { User } from '@shared';
+import { ErrorScope, useErrorFocus } from '@/components/ErrorFocus';
 import { Field } from '@/components/Field';
 import { Body, Header } from '@/components/Screen';
 import { Banner, Button, Card, Divider, T } from '@/components/ui';
@@ -22,6 +23,8 @@ export default function SignIn() {
   const [email, setEmail] = useState('');
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const scroll = useRef<ScrollView>(null);
+  const errorFocus = useErrorFocus(scroll);
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
 
   const done = (r: { token: string; user: User }, msg: string) => {
@@ -34,7 +37,7 @@ export default function SignIn() {
 
   const signIn = async () => {
     setTried(true);
-    if (!name.trim() || !emailOk) return;
+    if (!name.trim() || !emailOk) return errorFocus.focusFirst();
     setBusy('email');
     try {
       done(await api('/auth/sign-in', { body: { name, email } }), `Signed in as ${name.trim()}`);
@@ -75,7 +78,8 @@ export default function SignIn() {
   return (
     <View style={{ flex: 1 }}>
       <Header title="Sign in" />
-      <Body>
+      <Body scrollRef={scroll} onScroll={errorFocus.onScroll} scrollEventThrottle={32}>
+        <ErrorScope registry={errorFocus.registry}>
         <View style={{ gap: space.sm }}>
           <T variant="title">Keep your campaigns and receipts</T>
           <T color="textMuted">You can browse and back campaigns without an account. Signing in keeps your drafts, campaigns and payment history in one place.</T>
@@ -108,6 +112,7 @@ export default function SignIn() {
           <Button label="Continue as Sam (review team)" icon="shield-checkmark-outline" variant="secondary" loading={busy === 'reviewer'} disabled={!!busy} onPress={() => demo('reviewer')} />
         </View>
         <Banner tone="neutral" icon="lock-closed-outline" body="Reviewer tools are only available to review-team accounts." />
+        </ErrorScope>
       </Body>
     </View>
   );

@@ -9,6 +9,7 @@ import { SaveIndicator, StepProgress } from '@/components/create/shared';
 import { StoryStep } from '@/components/create/StoryStep';
 import { SubmitStep } from '@/components/create/SubmitStep';
 import { VisualsStep } from '@/components/create/VisualsStep';
+import { ErrorScope, useErrorFocus } from '@/components/ErrorFocus';
 import { Footer, Header } from '@/components/Screen';
 import { Sheet } from '@/components/Sheet';
 import { Banner, Button, EmptyState, IconButton, Skeleton, T, haptic, AiBadge } from '@/components/ui';
@@ -27,6 +28,8 @@ export default function CampaignEditor() {
   const { c } = useTheme();
   const ed = useDraftEditor(id);
   const scroll = useRef<ScrollView>(null);
+  // Takes the person to the first field that still needs something after a failed Next/Submit.
+  const errorFocus = useErrorFocus(scroll);
   const [attempted, setAttempted] = useState<Set<number>>(new Set());
   const [confirm, setConfirm] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -107,7 +110,7 @@ export default function CampaignEditor() {
       haptic.warn();
       setAttempted((s) => new Set(s).add(step));
       toast(`${Object.keys(errs).length === 1 ? 'One thing needs' : `${Object.keys(errs).length} things need`} your attention`, 'error');
-      scroll.current?.scrollTo({ y: 0, animated: true });
+      errorFocus.focusFirst();
       return;
     }
     haptic.light();
@@ -122,7 +125,8 @@ export default function CampaignEditor() {
       const first = firstInvalidStep(d);
       toast(`Finish ${STEPS[first]} before submitting`, 'error');
       if (first !== step) goTo(first);
-      else scroll.current?.scrollTo({ y: 0, animated: true });
+      // A new step needs a moment to render before its fields can be measured.
+      errorFocus.focusFirst(first !== step ? 250 : 60);
       return;
     }
     setConfirm(true);
@@ -169,7 +173,8 @@ export default function CampaignEditor() {
       />
       <StepProgress step={step} onJump={goTo} invalid={invalid} />
 
-      <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: space.xl, paddingTop: space.lg, gap: space.xl, paddingBottom: space.huge }}>
+      <ScrollView ref={scroll} onScroll={errorFocus.onScroll} scrollEventThrottle={32} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: space.xl, paddingTop: space.lg, gap: space.xl, paddingBottom: space.huge }}>
+        <ErrorScope registry={errorFocus.registry}>
         {status === 'CHANGES_REQUESTED' && <Banner tone="warning" icon="chatbubble-ellipses-outline" title="Changes requested by reviewer" body={ed.reviewNote ?? 'Update your campaign and submit it again.'} />}
         {live && <Banner tone="info" icon="shield-checkmark-outline" title="This campaign is live" body="Edits are saved as a revision. Your public page and ads keep the approved version until a reviewer approves the changes. The funding goal can’t change." />}
         {ai === '1' && step === 0 && <Banner tone="accent" icon="create-outline" title="Drafted from your answers" body="Read every step and change anything that isn’t right. Add real links for the suggested sources, and set your own funding goal in Submit." />}
@@ -178,6 +183,7 @@ export default function CampaignEditor() {
         {step === 2 && <VisualsStep {...props} />}
         {step === 3 && <ReachStep {...props} />}
         {step === 4 && <SubmitStep {...props} onJump={goTo} />}
+        </ErrorScope>
       </ScrollView>
 
       <Footer>
