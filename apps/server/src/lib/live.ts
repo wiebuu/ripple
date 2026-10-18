@@ -1,5 +1,7 @@
 import type { Server } from 'node:http';
+import jwt from 'jsonwebtoken';
 import { WebSocket, WebSocketServer } from 'ws';
+import type { AppNotification } from '../../../../shared';
 import { db } from './db';
 import { env } from './env';
 
@@ -13,15 +15,29 @@ import { env } from './env';
  * never sent.
  */
 export type LiveEvent = { type: 'backed'; campaignId: string; raised: number; backerCount: number; name: string | null };
+/** Sent only to the signed-in user it belongs to, the moment it's created. */
+export type UserEvent = { type: 'notification'; notification: AppNotification };
 
 const rooms = new Map<string, Set<WebSocket>>();
+/** Each user's open connections (phone, tablet …), after they send `{ type: 'auth', token }`. */
+const users = new Map<string, Set<WebSocket>>();
+const userOf = new WeakMap<WebSocket, string>();
 const alive = new WeakMap<WebSocket, boolean>();
+
+function signOut(ws: WebSocket) {
+  const id = userOf.get(ws);
+  if (!id) return;
+  users.get(id)?.delete(ws);
+  if (!users.get(id)?.size) users.delete(id);
+  userOf.delete(ws);
+}
 
 function leaveAll(ws: WebSocket) {
   for (const [id, room] of rooms) {
     room.delete(ws);
     if (!room.size) rooms.delete(id);
   }
+  signOut(ws);
 }
 
 export function attachLive(server: Server) {
@@ -30,10 +46,24 @@ export function attachLive(server: Server) {
     alive.set(ws, true);
     ws.on('pong', () => alive.set(ws, true));
     ws.on('message', (raw) => {
-      let msg: { type?: string; campaignId?: unknown };
+      let msg: { type?: string; campaignId?: unknown; token?: unknown };
       try {
         msg = JSON.parse(String(raw));
       } catch {
+        return;
+      }
+      // The same bearer token the API uses; a bad or missing one just means no personal events.
+      if (msg.type === 'auth') {
+        signOut(ws);
+        if (typeof msg.token !== 'string') return;
+        try {
+          const { sub } = jwt.verify(msg.token, env.jwtSecret) as { sub: string };
+          userOf.set(ws, sub);
+          if (!users.has(sub)) users.set(sub, new Set());
+          users.get(sub)!.add(ws);
+        } catch {
+          // Invalid or expired token.
+        }
         return;
       }
       if (typeof msg.campaignId !== 'string' || !/^[a-f0-9]{24}$/.test(msg.campaignId)) return;
@@ -66,6 +96,11 @@ export function attachLive(server: Server) {
   wss.on('close', () => clearInterval(heartbeat));
   if (env.liveDemo) startDemoActivity();
   return wss;
+}
+
+export function publishToUser(userId: string, event: UserEvent) {
+  const data = JSON.stringify(event);
+  for (const ws of users.get(userId) ?? []) if (ws.readyState === WebSocket.OPEN) ws.send(data);
 }
 
 export function publish(event: LiveEvent) {

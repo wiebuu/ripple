@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { relTime } from '@/lib/format';
 import { queryClient, useNotificationFeed } from '@/lib/queries';
 import { KIND_META } from '@/lib/kinds';
+import { openNotification } from '@/lib/openNotification';
 import { radius, space, useTheme } from '@/theme';
 import { PullArea, usePullRefresh } from '@/hooks/usePullRefresh';
 import { RippleLoader } from '@/components/brand/RippleMark';
@@ -55,13 +56,7 @@ export default function Activity() {
     await api('/notifications/read', { body: {} }).catch(() => {});
     queryClient.invalidateQueries({ queryKey: ['notifications'] });
   };
-  const open = (n: AppNotification) => {
-    if (!n.read) api('/notifications/read', { body: { ids: [n.id] } }).then(() => queryClient.invalidateQueries({ queryKey: ['notifications'] })).catch(() => {});
-    if (!n.campaignId) return;
-    if (n.kind === 'REPORT') router.push({ pathname: '/campaign/[id]/report', params: { id: n.campaignId } });
-    else if (n.kind === 'REVIEW' || n.kind === 'SUBMISSION') router.push({ pathname: '/manage/[id]', params: { id: n.campaignId } });
-    else router.push({ pathname: '/campaign/[id]', params: { id: n.campaignId } });
-  };
+  const open = (n: AppNotification) => openNotification(n);
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }}>

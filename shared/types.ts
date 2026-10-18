@@ -186,6 +186,8 @@ export type AppNotification = {
   title: string;
   body: string;
   campaignId: string | null;
+  /** About a campaign the user owns (opens Manage rather than the public page). */
+  mine?: boolean;
   read: boolean;
   createdAt: string;
 };

@@ -15,6 +15,7 @@ import { Animated, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LoadingScreen } from '@/components/brand/LoadingScreen';
+import { NotificationBanner } from '@/components/NotificationBanner';
 import { ToastHost } from '@/components/Toast';
 import { prefetchHome, queryClient } from '@/lib/queries';
 import { useSession } from '@/lib/session';
@@ -76,6 +77,7 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="back/result/[kid]" options={{ gestureEnabled: false, animation: 'fade' }} />
             </Stack>
+            <NotificationBanner />
             <ToastHost />
           </ThemeProvider>
         </QueryClientProvider>

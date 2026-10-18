@@ -28,8 +28,11 @@ notifications.get(
       db.notification.count({ where }),
       db.notification.count({ where: { userId: req.user!.id, read: false } }),
     ]);
+    // Which of these are about the user's own campaigns, so the app can open Manage for them.
+    const ids = [...new Set(items.map((n) => n.campaignId).filter((x): x is string => !!x))];
+    const own = new Set((await db.campaign.findMany({ where: { id: { in: ids }, ownerId: req.user!.id }, select: { id: true } })).map((c) => c.id));
     res.json({
-      items: items.map((n) => ({ id: n.id, kind: n.kind, title: n.title, body: n.body, campaignId: n.campaignId, read: n.read, createdAt: n.createdAt.toISOString() })),
+      items: items.map((n) => ({ id: n.id, kind: n.kind, title: n.title, body: n.body, campaignId: n.campaignId, mine: !!n.campaignId && own.has(n.campaignId), read: n.read, createdAt: n.createdAt.toISOString() })),
       total,
       unread,
       nextOffset: offset + items.length < total ? offset + items.length : null,

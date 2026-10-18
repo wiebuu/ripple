@@ -1,9 +1,9 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Device from 'expo-device';
-import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { api } from './api';
+import { openNotification } from './openNotification';
 import { useSession } from './session';
 
 type Notifications = typeof import('expo-notifications');
@@ -25,8 +25,8 @@ let deviceToken: string | null = null;
 
 if (supported) {
   load().setNotificationHandler({
-    // Shown as a banner even while the app is open (Android needs sound on for the heads-up banner).
-    handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
+    // While the app is open the in-app banner (live connection) shows it, so the system one stays quiet.
+    handleNotification: async () => ({ shouldShowBanner: false, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }),
   });
 }
 
@@ -49,11 +49,15 @@ export async function unregisterPush() {
   await api('/me/push-token', { body: { token: deviceToken, platform: Platform.OS, on: false } }).catch(() => {});
 }
 
-/** Opens the campaign a notification is about, or Activity for general ones. */
+/** Opens what a tapped push is about, with the same destinations as Activity and the in-app banner. */
 function openFrom(response: import('expo-notifications').NotificationResponse) {
-  const id = response.notification.request.content.data?.campaignId;
-  if (typeof id === 'string' && id) router.push({ pathname: '/campaign/[id]', params: { id } });
-  else router.navigate('/activity');
+  const d = (response.notification.request.content.data ?? {}) as Record<string, unknown>;
+  openNotification({
+    id: typeof d.id === 'string' ? d.id : undefined,
+    kind: (typeof d.kind === 'string' ? d.kind : 'UPDATE') as Parameters<typeof openNotification>[0]['kind'],
+    campaignId: typeof d.campaignId === 'string' ? d.campaignId : null,
+    mine: d.mine === true,
+  });
 }
 
 /**
