@@ -8,6 +8,7 @@ import { db } from '../lib/db';
 import { ah, forbidden, HttpError, notFound } from '../lib/http';
 import { transition } from '../lib/lifecycle';
 import { audienceOf, notify, notifyMany } from '../lib/notify';
+import { publish } from '../lib/live';
 import { contentOf, toContribution, toSummary } from '../lib/serialize';
 
 export const contributions = Router();
@@ -89,6 +90,7 @@ async function settle(id: string) {
     return tx.campaign.update({ where: { id: k.campaignId }, data: { raised: { increment: k.amount }, backerCount: { increment: 1 } } });
   });
   if (!c) return;
+  publish({ type: 'backed', campaignId: c.id, raised: c.raised, backerCount: c.backerCount, name: k.showName ? k.displayName?.trim() || null : null });
   if (k.userId) {
     await db.follow.upsert({ where: { userId_campaignId: { userId: k.userId, campaignId: c.id } }, create: { userId: k.userId, campaignId: c.id }, update: {} });
     await notify(k.userId, {

@@ -11,6 +11,7 @@ import type {
   NotificationPrefs,
 } from '@shared';
 import { api } from './api';
+import { toast } from './toast';
 import { useSession } from './session';
 
 export const queryClient = new QueryClient({
@@ -115,28 +116,65 @@ export const useNotificationFeed = (scope: 'all' | 'following' = 'all') => {
   return useInfiniteList<AppNotification>(['notifications', 'feed', scope, token], `/notifications?scope=${scope}`, !!token);
 };
 
-/** Follow/unfollow from a list card, updating every cached list that contains the campaign. */
-export function useFollowCampaign() {
+type CampaignPatch = Partial<Pick<Detail, 'isFollowing' | 'isSaved' | 'raised' | 'backerCount'>>;
+
+/**
+ * Optimistic update: applies `patch` to every cached copy of a campaign (its
+ * page, every list and every "me" list) right away, and returns a function that
+ * puts all of them back exactly as they were if the server says no.
+ */
+export function patchCampaignEverywhere(id: string, patch: CampaignPatch) {
+  const qc = queryClient;
+  const snapshots: [readonly unknown[], unknown][] = [];
+  const keep = (key: readonly unknown[], old: unknown) => snapshots.push([key, old]);
+  const fix = (c: CampaignSummary) => (c.id === id ? { ...c, ...patch } : c);
+  const patchList = (old: any) => {
+    if (!old) return old;
+    if (old.pages) return { ...old, pages: old.pages.map((p: any) => ({ ...p, items: p.items?.map(fix) ?? p.items })) };
+    if (Array.isArray(old.items)) return { ...old, items: old.items.map(fix) };
+    return old;
+  };
+  for (const [key, old] of qc.getQueriesData({ queryKey: ['campaigns'] })) {
+    keep(key, old);
+    qc.setQueryData(key, patchList(old));
+  }
+  for (const [key, old] of qc.getQueriesData({ queryKey: ['me'] })) {
+    keep(key, old);
+    qc.setQueryData(key, patchList(old));
+  }
+  const detail = qc.getQueryData<Detail>(['campaign', id]);
+  if (detail) {
+    keep(['campaign', id], detail);
+    qc.setQueryData<Detail>(['campaign', id], { ...detail, ...patch });
+  }
+  return () => snapshots.forEach(([key, old]) => qc.setQueryData(key, old));
+}
+
+/** Follow/unfollow or save/unsave: shows the change at once, undoes it quietly if the request fails. */
+function useOptimisticToggle(kind: 'follow' | 'save') {
   const qc = useQueryClient();
+  const field = kind === 'follow' ? 'isFollowing' : 'isSaved';
   return useMutation({
-    mutationFn: ({ id, on }: { id: string; on: boolean }) => api(`/campaigns/${id}/follow`, { body: { on } }),
-    onMutate: ({ id, on }) => {
-      const patch = (c: CampaignSummary) => (c.id === id ? { ...c, isFollowing: on } : c);
-      qc.setQueriesData<any>({ queryKey: ['campaigns'] }, (old: any) => {
-        if (!old) return old;
-        if (old.pages) return { ...old, pages: old.pages.map((p: any) => ({ ...p, items: p.items.map(patch) })) };
-        if (old.items) return { ...old, items: old.items.map(patch) };
-        return old;
-      });
-      qc.setQueryData<Detail>(['campaign', id], (d) => d && { ...d, isFollowing: on });
+    mutationFn: ({ id, on }: { id: string; on: boolean }) => api(`/campaigns/${id}/${kind}`, { body: { on } }),
+    onMutate: async ({ id, on }) => {
+      // Stop in-flight fetches from overwriting the optimistic value with older data.
+      await qc.cancelQueries({ queryKey: ['campaign', id] });
+      return { undo: patchCampaignEverywhere(id, { [field]: on }) };
+    },
+    onError: (_e, { on }, ctx) => {
+      ctx?.undo();
+      toast(`Couldn’t ${on ? kind : kind === 'follow' ? 'unfollow' : 'unsave'}. Check your connection and try again.`, 'error');
     },
     onSettled: (_r, _e, { id }) => {
-      qc.invalidateQueries({ queryKey: ['me', 'following'] });
-      qc.invalidateQueries({ queryKey: ['notifications'] });
       qc.invalidateQueries({ queryKey: ['campaign', id] });
+      qc.invalidateQueries({ queryKey: ['me'] });
+      if (kind === 'follow') qc.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
 }
+
+/** Follow/unfollow from a list card, updating every cached list that contains the campaign. */
+export const useFollowCampaign = () => useOptimisticToggle('follow');
 
 export const useBacked = () =>
   useQuery({ queryKey: ['me', 'backed'], queryFn: () => api<{ items: (CampaignSummary & { myTotal: number })[] }>('/me/backed') });
@@ -164,18 +202,10 @@ export type DraftResponse = CampaignSummary & { content: DraftContent; latestRev
 export const useDraft = (id?: string) =>
   useQuery({ queryKey: ['draft', id], queryFn: () => api<DraftResponse>(`/drafts/${id}`), enabled: !!id && id !== 'new' });
 
+/** Follow or save toggle bound to one campaign (its page). */
 export function useToggle(kind: 'follow' | 'save', id: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (on: boolean) => api(`/campaigns/${id}/${kind}`, { body: { on } }),
-    onMutate: async (on) => {
-      qc.setQueryData<Detail>(['campaign', id], (d) => d && { ...d, [kind === 'follow' ? 'isFollowing' : 'isSaved']: on });
-    },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['campaign', id] });
-      qc.invalidateQueries({ queryKey: ['me'] });
-    },
-  });
+  const m = useOptimisticToggle(kind);
+  return { ...m, mutate: (on: boolean) => m.mutate({ id, on }) };
 }
 
 /** Everything that depends on campaign money or status. */
@@ -188,8 +218,8 @@ export function invalidateCampaign(id: string) {
 }
 
 export type ReviewItem = CampaignSummary & { hasPendingRevision: boolean; openReports: number; budgetApproved: boolean; adSetupReady: boolean };
-export const useReviewQueue = () =>
-  useQuery({ queryKey: ['review', 'queue'], queryFn: () => api<{ items: ReviewItem[] }>('/review/queue') });
+export const useReviewQueue = (enabled = true) =>
+  useQuery({ queryKey: ['review', 'queue'], queryFn: () => api<{ items: ReviewItem[] }>('/review/queue'), enabled });
 
 export type ReviewDetail = CampaignSummary & {
   content: DraftContent;

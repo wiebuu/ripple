@@ -9,7 +9,7 @@ import type { TestMethod, TestOutcome } from '@/components/RazorpayTestGuide';
 import { Body, Header } from '@/components/Screen';
 import { ErrorState, Skeleton } from '@/components/ui';
 import { useBacking, type PayResult } from '@/lib/backing';
-import { invalidateCampaign, queryClient, useCampaign } from '@/lib/queries';
+import { invalidateCampaign, patchCampaignEverywhere, queryClient, useCampaign } from '@/lib/queries';
 import { useTheme } from '@/theme';
 
 type Step = 'amount' | 'review' | 'pay' | 'checkout';
@@ -58,6 +58,8 @@ export default function BackingFlow() {
   const done = (r: PayResult) => {
     // Hand the fresh result over so the result screen never shows a stale state.
     queryClient.setQueryData(['contribution', r.contribution.id], r);
+    // Show the new total everywhere straight away, then confirm with a refetch.
+    patchCampaignEverywhere(id, { raised: r.campaign.raised, backerCount: r.campaign.backerCount });
     invalidateCampaign(id);
     router.replace({ pathname: '/back/result/[kid]', params: { kid: r.contribution.id } });
   };

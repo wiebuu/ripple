@@ -88,6 +88,35 @@ npx eas-cli@latest build -p android --profile preview
 
 When it finishes, EAS prints a link to download the `.apk`.
 
+## 4b. Push notifications (one-time setup)
+
+The server already sends every notification (approved, milestones, ads live …) to phones through
+Expo's push service. Android delivery goes through Firebase Cloud Messaging, which needs your
+Firebase project linked once:
+
+1. Link the app to an EAS project (adds `extra.eas.projectId` to `app.json`):
+   ```bash
+   cd apps/mobile
+   npx eas-cli@latest init
+   ```
+2. Firebase console → Project settings → General → **Add app → Android**, package name
+   `com.ripple.app`. Download `google-services.json` into `apps/mobile/`, then add to `app.json`
+   under `expo.android`: `"googleServicesFile": "./google-services.json"`.
+3. Firebase console → Project settings → **Service accounts → Generate new private key**. Upload
+   that JSON to Expo:
+   ```bash
+   npx eas-cli@latest credentials
+   ```
+   Android → production/preview → Google Service Account → **FCM V1** → upload the key.
+4. Rebuild the APK. On first launch the app asks for notification permission and registers the
+   phone. Push doesn't work in Expo Go on Android; it does in the APK.
+
+## Live updates
+
+Campaign pages update live over a WebSocket at `ws://<VPS_IP>:4000/live` (same port, nothing to open).
+Sample campaigns get an occasional simulated backer while someone is watching, so it can be seen
+with one phone. Set `LIVE_DEMO=0` in `.env` to turn that off.
+
 ## 5. Before sending it to anyone
 
 - Install the APK on your own phone, switch to **mobile data**, and walk through:

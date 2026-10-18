@@ -20,8 +20,8 @@ const GROUPS: { key: string; label: string; match: (x: ReviewItem) => boolean }[
   { key: 'closed', label: 'Closed', match: (x) => (['COMPLETED', 'REJECTED', 'CANCELLED', 'REFUND_PENDING', 'FAILED', 'CHANGES_REQUESTED'] as CampaignStatus[]).includes(x.status) },
 ];
 
-/** Internal review queue. Only reviewer accounts can load it (enforced by the API). */
-export default function ReviewQueue() {
+/** Internal review queue, shown as the Review tab for reviewer accounts. Only they can load it (enforced by the API). */
+export function ReviewQueue() {
   const { c } = useTheme();
   const user = useSession((s) => s.user);
   const q = useReviewQueue();
@@ -31,7 +31,7 @@ export default function ReviewQueue() {
   if (user?.role !== 'REVIEWER')
     return (
       <View style={{ flex: 1, backgroundColor: c.bg }}>
-        <Header title="Review" />
+        <Header title="Review" back={false} />
         <EmptyState icon="lock-closed-outline" title="Reviewer access only" body="Sign in with a review-team account to use these tools." action={<Button label="Sign in" onPress={() => router.replace('/sign-in')} />} />
       </View>
     );
@@ -42,7 +42,7 @@ export default function ReviewQueue() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <Header title="Review queue" subtitle="Internal · review team" />
+      <Header title="Review queue" subtitle="Internal · review team" back={false} />
       <View style={{ height: 56 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: space.xl, gap: space.sm, alignItems: 'center' }}>
           {GROUPS.map((g) => (

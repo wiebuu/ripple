@@ -4,7 +4,7 @@ import { Animated, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DASHBOARD_TABS } from '@shared';
 import { TabHeader } from '@/components/TabHeader';
-import { Button, Card, Icon, IconButton, Pill, T, haptic, type IconName } from '@/components/ui';
+import { Button, Icon, IconButton, Pill, T, haptic, type IconName } from '@/components/ui';
 import { useTabReselect } from '@/hooks/useTabReselect';
 import { useBacked, useFollowing, useMyCampaigns, useSaved } from '@/lib/queries';
 import { useSession } from '@/lib/session';
@@ -66,19 +66,6 @@ export default function Profile() {
       </View>
       {guest && <Button label="Sign in or create an account" icon="log-in-outline" onPress={() => router.push('/sign-in')} />}
 
-      {user?.role === 'REVIEWER' && (
-        <Card onPress={() => router.push('/review')} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, backgroundColor: c.infoSoft, borderColor: c.infoSoft }}>
-          <View style={{ flex: 1 }}>
-            <T variant="bodyStrong">Review queue</T>
-            <T variant="small" color="textMuted">
-              Approve campaigns, request changes, authorise distribution
-            </T>
-          </View>
-          <T variant="smallStrong" color="info">
-            Open
-          </T>
-        </Card>
-      )}
 
       <CampaignJourney counts={counts} loading={mine.isPending} needsAction={needsAction} />
 

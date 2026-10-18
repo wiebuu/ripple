@@ -25,6 +25,7 @@ model User {
   notifications Notification[]
   follows       Follow[]
   saves         Save[]
+  pushTokens    PushToken[]
   prefs         Json?
 
   @@index([email])
@@ -202,4 +203,17 @@ model Complaint {
 
   @@index([status])
   @@index([campaignId])
+}
+
+/// Expo push tokens: one per installed app. A token moves to whoever signs in on that device.
+model PushToken {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  token     String   @unique
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  platform  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }

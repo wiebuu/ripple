@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { Pressable, View } from 'react-native';
 import { BACKABLE_STATUSES, REACH_CONFIG, STATUS_META, feeBreakdown, peoplePerHundred, type CampaignSummary } from '@shared';
 import { formatMoney, formatReach, pct, relTime, timeLeft } from '@/lib/format';
@@ -75,13 +75,42 @@ export function ReachLine({ people, label = 'people reached at goal', factor }: 
   );
 }
 
+/**
+ * A number that counts up (or down) to its new value instead of jumping, so a
+ * live change to a total is noticed. The first render shows the value as is.
+ */
+export function CountUp({ value, format, ...text }: { value: number; format: (n: number) => string } & Omit<ComponentProps<typeof T>, 'children'>) {
+  const [shown, setShown] = useState(value);
+  const from = useRef(value);
+  useEffect(() => {
+    const start = from.current;
+    if (start === value) return;
+    const t0 = Date.now();
+    let frame = 0;
+    const step = () => {
+      const k = Math.min(1, (Date.now() - t0) / 800);
+      const v = start + (value - start) * (1 - (1 - k) ** 3);
+      from.current = v;
+      setShown(v);
+      if (k < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+  return (
+    <T {...text} style={[{ fontVariant: ['tabular-nums'] }, text.style]}>
+      {format(Math.round(shown))}
+    </T>
+  );
+}
+
 export function Funding({ c: campaign, compact }: { c: CampaignSummary; compact?: boolean }) {
   const p = pct(campaign.raised, campaign.goal);
   const left = BACKABLE_STATUSES.includes(campaign.status) ? timeLeft(campaign.endsAt) : null;
   return (
     <View style={{ gap: 6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-        <T variant={compact ? 'bodyStrong' : 'subheading'}>{formatMoney(campaign.raised)}</T>
+        <CountUp variant={compact ? 'bodyStrong' : 'subheading'} value={campaign.raised} format={(n) => formatMoney(n)} />
         <T variant="small" color="textMuted" style={{ flex: 1 }}>
           of {formatMoney(campaign.goal)}
         </T>

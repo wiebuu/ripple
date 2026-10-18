@@ -8,6 +8,19 @@ import { toContribution, toSummary } from '../lib/serialize';
 export const me = Router();
 me.use(requireAuth);
 
+/** Registers (on: true) or removes (on: false) this device's Expo push token for the signed-in user. */
+me.post(
+  '/push-token',
+  ah(async (req, res) => {
+    const { token, platform, on } = z
+      .object({ token: z.string().regex(/^Expo(nent)?PushToken\[[^\]]+\]$/), platform: z.enum(['ios', 'android']), on: z.boolean().default(true) })
+      .parse(req.body);
+    if (on) await db.pushToken.upsert({ where: { token }, create: { token, platform, userId: req.user!.id }, update: { userId: req.user!.id, platform } });
+    else await db.pushToken.deleteMany({ where: { token, userId: req.user!.id } });
+    res.json({ ok: true });
+  }),
+);
+
 me.get(
   '/campaigns',
   ah(async (req, res) => {

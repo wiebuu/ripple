@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BACKABLE_STATUSES, CHANNELS, REACH_CONFIG, STATUS_META, feeBreakdown } from '@shared';
@@ -13,6 +13,7 @@ import { Banner, Button, Card, DemoBadge, ErrorState, Icon, IconButton, Pill, Sk
 import { api } from '@/lib/api';
 import { formatMoney, formatReach, pct, relTime, shortDate, timeLeft } from '@/lib/format';
 import { useCampaign, useFollowCampaign, useToggle, type Detail } from '@/lib/queries';
+import { useLiveCampaign } from '@/lib/live';
 import { useSession } from '@/lib/session';
 import { useBackOrPush } from '@/lib/nav';
 import { shareCampaign } from '@/lib/share';
@@ -329,8 +330,12 @@ function SaveButton({ d }: { d: Detail }) {
 function FundingCard({ d }: { d: Detail }) {
   const follow = useFollowCampaign();
   const backable = BACKABLE_STATUSES.includes(d.status);
+  // While backing is open, new backings arrive over the live connection and the totals count up in place.
+  const [flash, setFlash] = useState<{ key: number; text: string } | null>(null);
+  const live = useLiveCampaign(backable ? d.id : undefined, (e) => setFlash({ key: Date.now(), text: e.name ? `${e.name} just backed this` : 'Someone just backed this' }));
   return (
     <Card style={{ gap: space.md }}>
+      {backable && live && <LiveNote flash={flash} />}
       <Funding c={d} />
       <SupporterStack count={d.backerCount} names={d.publicBackers.map((b) => b.name)} cta={backable} />
       <ReachLine people={d.reachAtGoal} factor={d.reachFactor} />
@@ -358,6 +363,52 @@ function FundingCard({ d }: { d: Detail }) {
         </T>
       )}
     </Card>
+  );
+}
+
+/** "Live" marker for the funding card; when someone backs, the dot pulses and a short note fades in and out. */
+function LiveNote({ flash }: { flash: { key: number; text: string } | null }) {
+  const { c } = useTheme();
+  const [note] = useState(() => new Animated.Value(0));
+  const [ring] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (!flash) return;
+    haptic.light();
+    // Zero-length timings reset the values: setValue doesn't reach natively driven values on Android.
+    const to = (v: Animated.Value, toValue: number, duration: number) => Animated.timing(v, { toValue, duration, useNativeDriver: true });
+    Animated.parallel([
+      Animated.sequence([to(note, 0, 0), to(note, 1, 220), Animated.delay(3600), to(note, 0, 400)]),
+      Animated.sequence([to(ring, 0, 0), to(ring, 1, 1100)]),
+    ]).start();
+  }, [flash, note, ring]);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }} accessibilityLiveRegion="polite">
+      <View style={{ width: 10, height: 10, alignItems: 'center', justifyContent: 'center' }}>
+        <Animated.View
+          style={{
+            position: 'absolute',
+            width: 10,
+            height: 10,
+            borderRadius: 5,
+            borderWidth: 1.5,
+            borderColor: c.primary,
+            opacity: ring.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0] }),
+            transform: [{ scale: ring.interpolate({ inputRange: [0, 1], outputRange: [1, 3] }) }],
+          }}
+        />
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.primary }} />
+      </View>
+      <T variant="smallStrong" color="primary">
+        Live
+      </T>
+      {!!flash && (
+        <Animated.View style={{ flex: 1, opacity: note }}>
+          <T variant="small" color="textMuted" numberOfLines={1}>
+            · {flash.text}
+          </T>
+        </Animated.View>
+      )}
+    </View>
   );
 }
 

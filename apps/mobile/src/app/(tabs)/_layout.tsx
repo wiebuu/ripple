@@ -1,7 +1,9 @@
 import { Tabs } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { Icon, haptic, type IconName } from '@/components/ui';
-import { useNotifications } from '@/lib/queries';
+import { useNotifications, useReviewQueue } from '@/lib/queries';
+import { usePushNotifications } from '@/lib/push';
+import { useSession } from '@/lib/session';
 import { shadow, useTheme } from '@/theme';
 
 const tab = (title: string, icon: IconName, iconActive: IconName) => ({
@@ -37,7 +39,12 @@ function CreateButton({ onPress, accessibilityState }: { onPress?: (e: any) => v
 /** Five stable primary destinations. Icons only; each tab keeps an accessibility label. */
 export default function TabsLayout() {
   const { c } = useTheme();
+  usePushNotifications();
   const unread = useNotifications().data?.unread ?? 0;
+  const reviewer = useSession((s) => s.user?.role === 'REVIEWER');
+  // Campaigns waiting on a decision: new submissions and edits to live campaigns.
+  const waiting = (useReviewQueue(reviewer).data?.items ?? []).filter((x) => x.status === 'SUBMITTED' || x.hasPendingRevision).length;
+  const badge = (n: number) => (n ? (n > 9 ? '9+' : n) : undefined);
   return (
     <Tabs
       screenListeners={{ tabPress: () => haptic.light() }}
@@ -55,7 +62,12 @@ export default function TabsLayout() {
       <Tabs.Screen name="create" options={{ title: 'Create', tabBarButton: (props) => <CreateButton onPress={props.onPress} accessibilityState={props.accessibilityState} /> }} />
       <Tabs.Screen
         name="activity"
-        options={{ ...tab('Activity', 'notifications-outline', 'notifications'), tabBarBadge: unread ? (unread > 9 ? '9+' : unread) : undefined, tabBarBadgeStyle: { backgroundColor: c.primary, color: c.onPrimary, fontSize: 10, fontWeight: '700', minWidth: 18, height: 18, lineHeight: 18, borderRadius: 9 } }}
+        options={{ ...tab('Activity', 'notifications-outline', 'notifications'), tabBarBadge: badge(unread), tabBarBadgeStyle: { backgroundColor: c.primary, color: c.onPrimary, fontSize: 10, fontWeight: '700', minWidth: 18, height: 18, lineHeight: 18, borderRadius: 9 } }}
+      />
+      {/* Review team only: hidden from everyone else (href: null keeps the route but drops the tab). */}
+      <Tabs.Screen
+        name="moderation"
+        options={{ ...tab('Review', 'shield-checkmark-outline', 'shield-checkmark'), href: reviewer ? undefined : null, tabBarBadge: badge(waiting), tabBarBadgeStyle: { backgroundColor: c.warning, color: c.onPrimary, fontSize: 10, fontWeight: '700', minWidth: 18, height: 18, lineHeight: 18, borderRadius: 9 } }}
       />
       <Tabs.Screen name="profile" options={tab('Profile', 'person-circle-outline', 'person-circle')} />
     </Tabs>

@@ -47,6 +47,14 @@
             "usesCleartextTraffic": true
           }
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#3FCF8E",
+          "defaultChannel": "default"
+        }
       ]
     ],
     "experiments": {

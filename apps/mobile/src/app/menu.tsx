@@ -5,6 +5,7 @@ import { Card, Divider, Icon, ListRow, T, haptic, type IconName } from '@/compon
 import { useAppearance, type AppearanceMode } from '@/lib/appearance';
 import { googleSignOut } from '@/lib/google';
 import { queryClient, useBacked, useFollowing, useMyContributions, useSaved } from '@/lib/queries';
+import { unregisterPush } from '@/lib/push';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { radius, space, useTheme } from '@/theme';
@@ -91,7 +92,8 @@ export default function Menu() {
   const info = (page: string) => () => router.push({ pathname: '/info/[page]', params: { page } });
 
   const signOut = () => {
-    const go = () => {
+    const go = async () => {
+      await unregisterPush();
       googleSignOut();
       reset();
       queryClient.clear();

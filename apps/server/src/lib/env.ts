@@ -29,6 +29,8 @@ export const env = {
   razorpay: razorpayConfig(),
   /** Test-card gateway used only by the automated API test suite (it can't drive Razorpay's checkout UI). Off by default. */
   allowSimulatedPayments: process.env.ALLOW_SIMULATED_PAYMENTS === '1',
+  /** Occasional simulated backers on sample campaigns while someone watches, so live updates show on one phone. LIVE_DEMO=0 turns it off. */
+  liveDemo: process.env.LIVE_DEMO !== '0',
 };
 
 if (process.env.NODE_ENV === 'production' && env.jwtSecret === 'dev-only-change-me') {

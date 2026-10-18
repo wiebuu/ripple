@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { env } from './lib/env';
 import { startScheduler } from './lib/jobs';
+import { attachLive } from './lib/live';
 import { optionalAuth } from './lib/auth';
 import { errorHandler } from './lib/http';
 import { auth } from './routes/auth';
@@ -45,7 +46,8 @@ app.use('/uploads', uploads);
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 app.use(errorHandler);
 
-app.listen(env.port, '0.0.0.0', () => {
+const server = app.listen(env.port, '0.0.0.0', () => {
   console.log(`API listening on :${env.port}`);
   if (process.env.NODE_ENV !== 'test') startScheduler();
 });
+attachLive(server);

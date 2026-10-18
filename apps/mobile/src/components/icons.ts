@@ -238,6 +238,7 @@ export const ICONS = {
   'search-outline': [MagnifyingGlassIcon, 'regular'],
   'settings-outline': [GearSixIcon, 'regular'],
   'share-outline': [ExportIcon, 'regular'],
+  'shield-checkmark': [ShieldCheckIcon, 'fill'],
   'shield-checkmark-outline': [ShieldCheckIcon, 'regular'],
   'shield-outline': [ShieldIcon, 'regular'],
   'sparkles': [SparkleIcon, 'fill'],
