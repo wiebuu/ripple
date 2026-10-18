@@ -10,15 +10,15 @@ import { Banner, Button, Chip, Icon, IconButton, Pill, T, haptic } from '../ui';
 import { ImageSlot } from './ImageSlot';
 import { FieldError, Label, StepIntro, type StepProps } from './shared';
 import { CampaignVideo } from '../CampaignVideo';
+import { AdMock, adFromDraft, PLACEMENTS, type Placement } from '../AdPreview';
 
 const CTAS = ['Learn more', 'Read the story', 'Have your say', 'See the facts', 'Sign up'];
-const PLACEMENTS = ['Feed', 'Story', 'Search'] as const;
 
 export function VisualsStep({ d, update, errors }: StepProps) {
   const { c } = useTheme();
   const v = d.visuals;
   const set = (p: Partial<typeof v>) => update((x) => ({ ...x, visuals: { ...x.visuals, ...p } }));
-  const [placement, setPlacement] = useState<(typeof PLACEMENTS)[number]>('Feed');
+  const [placement, setPlacement] = useState<Placement>('Feed');
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const cover = v.coverImage || d.basics.coverImage;
 
@@ -129,76 +129,9 @@ export function VisualsStep({ d, update, errors }: StepProps) {
   );
 }
 
-export function AdPreview({ d, placement }: { d: DraftContent; placement: 'Feed' | 'Story' | 'Search' }) {
-  const { c } = useTheme();
-  const v = d.visuals;
-  const img = v.adImages[0] || v.coverImage || d.basics.coverImage;
-  const headline = v.adHeadline || d.basics.title.slice(0, 40) || 'Your ad headline';
-  const desc = v.adDescription || d.basics.summary || 'Your ad description appears here.';
-  const by = d.basics.creatorName || 'Your name';
-
-  if (placement === 'Search')
-    return (
-      <View style={{ padding: space.lg, borderRadius: radius.md, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E3E3E3', gap: 4 }}>
-        <T variant="small" style={{ color: '#202124' }}>
-          <T variant="smallStrong" style={{ color: '#202124' }}>Sponsored</T> · ripple.example
-        </T>
-        <T style={{ color: '#1A0DAB', fontSize: 18 }} numberOfLines={1}>
-          {headline}
-        </T>
-        <T variant="small" style={{ color: '#4D5156' }} numberOfLines={2}>
-          {desc}
-        </T>
-      </View>
-    );
-
-  if (placement === 'Story')
-    return (
-      <View style={{ alignSelf: 'center', width: 220, aspectRatio: 9 / 16, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#111' }}>
-        {img ? <Image source={img} style={{ position: 'absolute', inset: 0 }} contentFit="cover" /> : null}
-        <View style={{ flex: 1, justifyContent: 'space-between', padding: space.md, backgroundColor: 'rgba(0,0,0,0.25)' }}>
-          <T variant="smallStrong" style={{ color: '#fff' }}>
-            {by} · Sponsored
-          </T>
-          <View style={{ gap: space.sm }}>
-            <T variant="subheading" style={{ color: '#fff' }}>
-              {headline}
-            </T>
-            <View style={{ alignSelf: 'center', paddingHorizontal: space.lg, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: '#fff' }}>
-              <T variant="smallStrong" style={{ color: '#111' }}>
-                {v.ctaText || 'Learn more'}
-              </T>
-            </View>
-          </View>
-        </View>
-      </View>
-    );
-
-  return (
-    <View style={{ borderRadius: radius.md, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, overflow: 'hidden' }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.md }}>
-        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.primarySoft }} />
-        <View>
-          <T variant="smallStrong">{by}</T>
-          <T variant="small" color="textMuted">
-            Sponsored
-          </T>
-        </View>
-      </View>
-      <T style={{ paddingHorizontal: space.md, paddingBottom: space.sm }} numberOfLines={2}>
-        {desc}
-      </T>
-      {img ? <Image source={img} style={{ width: '100%', aspectRatio: 1 }} contentFit="cover" /> : <View style={{ width: '100%', aspectRatio: 1, backgroundColor: c.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><T color="textSubtle">No image yet</T></View>}
-      <View style={{ flexDirection: 'row', alignItems: 'center', padding: space.md, gap: space.md, backgroundColor: c.surfaceAlt }}>
-        <T variant="bodyStrong" style={{ flex: 1 }} numberOfLines={1}>
-          {headline}
-        </T>
-        <View style={{ paddingHorizontal: space.md, paddingVertical: 6, borderRadius: radius.sm, backgroundColor: c.border }}>
-          <T variant="smallStrong">{v.ctaText || 'Learn more'}</T>
-        </View>
-      </View>
-    </View>
-  );
+/** The draft's ad in one placement (shared mock, also used on the public campaign page). */
+export function AdPreview({ d, placement }: { d: DraftContent; placement: Placement }) {
+  return <AdMock ad={adFromDraft(d)} placement={placement} />;
 }
 
 /** Optional creative-quality prompt: simple, explainable checks. */

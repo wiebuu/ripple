@@ -103,6 +103,7 @@ import { TrophyIcon } from 'phosphor-react-native/src/icons/Trophy';
 import { UserIcon } from 'phosphor-react-native/src/icons/User';
 import { UserCircleIcon } from 'phosphor-react-native/src/icons/UserCircle';
 import { UsersThreeIcon } from 'phosphor-react-native/src/icons/UsersThree';
+import { PlayIcon } from 'phosphor-react-native/src/icons/Play';
 import { VideoCameraIcon } from 'phosphor-react-native/src/icons/VideoCamera';
 import { WarningIcon } from 'phosphor-react-native/src/icons/Warning';
 import { WarningCircleIcon } from 'phosphor-react-native/src/icons/WarningCircle';
@@ -217,6 +218,7 @@ export const ICONS = {
   'person-outline': [UserIcon, 'regular'],
   'phone-portrait-outline': [DeviceMobileIcon, 'regular'],
   'pie-chart-outline': [ChartPieIcon, 'regular'],
+  'play': [PlayIcon, 'fill'],
   'play-forward-outline': [FastForwardIcon, 'regular'],
   'push': [ArrowLineUpIcon, 'regular'],
   'radio': [WavesIcon, 'fill'],

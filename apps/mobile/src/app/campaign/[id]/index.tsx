@@ -21,6 +21,7 @@ import { radius, space, useTheme } from '@/theme';
 import { Sparkline } from '@/components/charts';
 import { PLATFORM_LOGOS } from '@/lib/platforms';
 import { CampaignVideo } from '@/components/CampaignVideo';
+import { AdPreviewSection, adFromCampaign } from '@/components/AdPreview';
 
 export default function CampaignScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -144,6 +145,10 @@ export default function CampaignScreen() {
         <View style={{ paddingHorizontal: space.xl, paddingTop: space.xxxl, gap: space.xl }}>
           {!!d.visuals.adVideo && <CampaignVideo uri={d.visuals.adVideo} />}
           <StoryView story={d.story} />
+        </View>
+
+        <View style={{ paddingHorizontal: space.xl, paddingTop: space.xxxl }}>
+          <AdPreviewSection ad={adFromCampaign(d)} platforms={d.reach.platforms} channels={d.reach.channels} />
         </View>
 
         <View style={{ paddingHorizontal: space.xl, paddingTop: space.xxxl }}>
