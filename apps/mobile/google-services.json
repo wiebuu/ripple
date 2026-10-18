@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "114519408015",
+    "project_id": "ripple-1b778",
+    "storage_bucket": "ripple-1b778.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:114519408015:android:a3a14864208ff7466ddffa",
+        "android_client_info": {
+          "package_name": "com.ripple.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPBuTHmPrseqJT1B51DBDdeZZpsrNItrE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:114519408015:android:f2e8c8e25cbc07a46ddffa",
+        "android_client_info": {
+          "package_name": "wiecodes.com"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPBuTHmPrseqJT1B51DBDdeZZpsrNItrE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

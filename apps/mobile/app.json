@@ -19,7 +19,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.ripple.app"
+      "package": "com.ripple.app",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "single",
