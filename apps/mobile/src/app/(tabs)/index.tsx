@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, FlatList, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,7 +29,18 @@ export default function Home() {
   const feed = useInfiniteCampaigns(HOME_FEED);
 
   const list = useRef<FlatList>(null);
-  const header = useCollapsingHeader();
+  // FlatList asks for the next page only once per content size, so a page that lands while the reader is
+  // still at the bottom would leave the loader spinning. Track how close the end is and keep loading.
+  const nearEnd = useRef(false);
+  const header = useCollapsingHeader(undefined, (e) => {
+    nearEnd.current = e.contentSize.height - (e.contentOffset.y + e.layoutMeasurement.height) < e.layoutMeasurement.height;
+  });
+  const { loadMore, isFetchingNextPage } = feed;
+  const pages = feed.data?.pages.length ?? 0;
+  useEffect(() => {
+    if (!isFetchingNextPage && nearEnd.current) loadMore();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run when a page lands, not when loadMore's identity changes
+  }, [pages, isFetchingNextPage]);
   const pull = usePullRefresh(() => Promise.all([feed.refetch(), featured.refetch()]), header.scrollY);
   const refresh = pull.onRefresh;
   const padTop = insets.top + header.height;
@@ -76,7 +87,7 @@ export default function Home() {
             </View>
           ) : null
         }
-        ListFooterComponent={<HomeFooter loading={feed.isFetchingNextPage} done={!feed.hasNextPage && feed.items.length > 0} pageError={feed.isFetchNextPageError} onRetry={() => feed.fetchNextPage()} />}
+        ListFooterComponent={<HomeFooter more={feed.isPending || !!feed.hasNextPage} done={!feed.hasNextPage && feed.items.length > 0} pageError={feed.isFetchNextPageError} onRetry={() => feed.fetchNextPage()} />}
       />
       </PatternScroll>
       </PullArea>
@@ -265,19 +276,29 @@ function HomeIntro({ featured }: { featured: ReturnType<typeof useCampaigns> }) 
   );
 }
 
-function HomeFooter({ loading, done, pageError, onRetry }: { loading: boolean; done: boolean; pageError: boolean; onRetry: () => void }) {
+/**
+ * End of the feed. While more campaigns remain it only shows the loader (as on
+ * Explore); the call to action and links appear once every campaign is in.
+ */
+function HomeFooter({ more, done, pageError, onRetry }: { more: boolean; done: boolean; pageError: boolean; onRetry: () => void }) {
   const { c } = useTheme();
+  if (pageError)
+    return (
+      <View style={{ paddingHorizontal: space.xl, paddingTop: space.lg }}>
+        <Button label="Couldn’t load more. Try again" variant="secondary" icon="refresh" onPress={onRetry} />
+      </View>
+    );
+  if (more)
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, paddingVertical: space.xl }} accessibilityLiveRegion="polite">
+        <RippleLoader />
+        <T variant="small" color="textMuted">
+          Loading more campaigns…
+        </T>
+      </View>
+    );
   return (
     <View style={{ paddingHorizontal: space.xl, gap: space.xl, paddingTop: space.sm }}>
-      {loading && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, paddingVertical: space.md }} accessibilityLiveRegion="polite">
-          <RippleLoader />
-          <T variant="small" color="textMuted">
-            Loading more campaigns…
-          </T>
-        </View>
-      )}
-      {pageError && <Button label="Couldn’t load more. Try again" variant="secondary" icon="refresh" onPress={onRetry} />}
       {!!done && (
         <T variant="small" color="textSubtle" center>
           You’ve seen every campaign. Check back soon.

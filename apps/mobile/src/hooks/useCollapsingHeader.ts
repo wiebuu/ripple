@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Animated } from 'react-native';
+import { Animated, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { TAB_HEADER_HEIGHT } from '@/components/TabHeader';
 
 /**
@@ -11,7 +11,8 @@ import { TAB_HEADER_HEIGHT } from '@/components/TabHeader';
  * pass the same value as RefreshControl's progressViewOffset (honoured on both
  * iOS and Android) so the pull-to-refresh spinner appears just below it.
  */
-export function useCollapsingHeader(delay = 96) {
+/** `onScrollJs` also receives every scroll event on the JS side (e.g. to track the distance to the end). */
+export function useCollapsingHeader(delay = 96, onScrollJs?: (e: NativeScrollEvent) => void) {
   const [scrollY] = useState(() => new Animated.Value(0));
   // Start at the tab header's known height so content is placed right on the first frame instead of jumping down once measured.
   const [height, setHeight] = useState(TAB_HEADER_HEIGHT);
@@ -30,7 +31,10 @@ export function useCollapsingHeader(delay = 96) {
       const h = Math.round(e.nativeEvent.layout.height);
       if (h !== height) setHeight(h);
     },
-    onScroll: Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true }),
+    onScroll: Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+      useNativeDriver: true,
+      listener: onScrollJs && ((e: NativeSyntheticEvent<NativeScrollEvent>) => onScrollJs(e.nativeEvent)),
+    }),
     headerStyle: { position: 'absolute' as const, top: 0, left: 0, right: 0, zIndex: 10, transform: [{ translateY }] },
   };
 }
