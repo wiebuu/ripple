@@ -1,6 +1,8 @@
 # Deploying Ripple: API on a VPS, APK for testers
 
-The APK talks to the API over plain HTTP at `http://<VPS_IP>:4000` (no domain needed).
+The APK talks to the API over plain HTTP at `http://<VPS_IP>:8473` (no domain needed).
+Port 8473 is used on the VPS so it isn't a commonly scanned port (avoid 6000: browsers block it).
+Local development on your Mac still uses port 4000.
 Android allows this because `usesCleartextTraffic` is turned on in `apps/mobile/app.json`.
 
 Replace `<VPS_IP>` everywhere below with your server's public IP.
@@ -42,8 +44,8 @@ nano .env
 
 ```
 DATABASE_URL="mongodb://127.0.0.1:27017/ripple?replicaSet=rs0&directConnection=true"
-PORT=4000
-PUBLIC_URL=http://<VPS_IP>:4000
+PORT=8473
+PUBLIC_URL=http://<VPS_IP>:8473
 JWT_SECRET=<a long random string: run `openssl rand -hex 32`>
 GEMINI_API_KEY=
 AI_MODEL=
@@ -63,22 +65,22 @@ pm2 startup   # prints one command; run it so the API restarts after a reboot
 ```
 
 Open the port (allow SSH first so you don't lock yourself out). If your provider has its own
-firewall or security group (AWS, Oracle, GCP, ...), open TCP 4000 there too.
+firewall or security group (AWS, Oracle, GCP, ...), open TCP 8473 there too.
 
 ```bash
 sudo ufw allow OpenSSH
-sudo ufw allow 4000/tcp
+sudo ufw allow 8473/tcp
 sudo ufw enable
 ```
 
-Check from your phone's browser on mobile data: `http://<VPS_IP>:4000/campaigns` should show JSON.
+Check from your phone's browser on mobile data: `http://<VPS_IP>:8473/campaigns` should show JSON.
 
 Updating later: `git pull && npm ci && pm2 restart ripple-api`.
 
 ## 4. Build the APK
 
 1. In `apps/mobile/eas.json`, under `build.preview.env`, set
-   `"EXPO_PUBLIC_API_URL": "http://<VPS_IP>:4000"`.
+   `"EXPO_PUBLIC_API_URL": "http://<VPS_IP>:8473"`.
 2. Build in the cloud (free Expo account; log in when asked):
 
 ```bash
@@ -113,7 +115,7 @@ Firebase project linked once:
 
 ## Live updates
 
-Campaign pages update live over a WebSocket at `ws://<VPS_IP>:4000/live` (same port, nothing to open).
+Campaign pages update live over a WebSocket at `ws://<VPS_IP>:8473/live` (same port, nothing to open).
 Sample campaigns get an occasional simulated backer while someone is watching, so it can be seen
 with one phone. Set `LIVE_DEMO=0` in `.env` to turn that off.
 
