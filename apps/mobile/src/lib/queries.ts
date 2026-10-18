@@ -22,7 +22,7 @@ export type ListParams = {
   category?: string;
   creatorType?: string;
   status?: 'funding' | 'promoting' | 'completed' | 'all';
-  sort?: 'trending' | 'newest' | 'closest' | 'ending' | 'most_backed';
+  sort?: 'trending' | 'newest' | 'closest' | 'ending';
   minPct?: number;
   featured?: boolean;
   limit?: number;

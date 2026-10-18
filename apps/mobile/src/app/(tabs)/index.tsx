@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Animated, FlatList, Pressable, useWindowDimensions, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Animated, FlatList, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CATEGORIES, peoplePerHundred } from '@shared';
 import { Wordmark } from '@/components/brand/Logo';
@@ -101,6 +102,35 @@ function Section({ title, action, onAction }: { title: string; action?: string; 
   );
 }
 
+/** Rings of the app mark spreading from a drop near the hero's top-right corner, fading as they widen. */
+const HERO_RINGS = [34, 62, 94, 130, 170, 214];
+const HERO_DROP = { right: 58, top: 56 };
+function HeroRipple() {
+  const { c, dark } = useTheme();
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <LinearGradient colors={[c.primarySoft, c.surface]} start={{ x: 1, y: 0 }} end={{ x: 0.25, y: 0.8 }} style={StyleSheet.absoluteFill} />
+      {HERO_RINGS.map((r, i) => (
+        <View
+          key={r}
+          style={{
+            position: 'absolute',
+            right: HERO_DROP.right - r,
+            top: HERO_DROP.top - r,
+            width: r * 2,
+            height: r * 2,
+            borderRadius: r,
+            borderWidth: i < 2 ? 2 : 1.5,
+            borderColor: c.primary,
+            opacity: (dark ? 0.32 : 0.4) * (1 - i / HERO_RINGS.length),
+          }}
+        />
+      ))}
+      <View style={{ position: 'absolute', right: HERO_DROP.right - 11, top: HERO_DROP.top - 11, width: 22, height: 22, borderRadius: 11, backgroundColor: c.primary }} />
+    </View>
+  );
+}
+
 function HomeIntro({ featured }: { featured: ReturnType<typeof useCampaigns> }) {
   const { c, dark } = useTheme();
   const { width } = useWindowDimensions();
@@ -109,47 +139,46 @@ function HomeIntro({ featured }: { featured: ReturnType<typeof useCampaigns> }) 
   const chips = usePatternScroll('x');
   return (
     <View style={{ gap: space.xxl }}>
-      {/* Hero: compact themed card with the faint swirl pattern */}
+      {/* Hero: a card that is itself a ripple, rings spreading from a drop in the corner. */}
       <View style={{ paddingHorizontal: space.lg, paddingTop: space.xs }}>
-        <View style={{ borderRadius: radius.xl, overflow: 'hidden', backgroundColor: c.surface, padding: space.lg + 2, gap: space.md, borderWidth: 1, borderColor: c.border }}>
-          <PatternWindow />
-          <T variant="overline" color="primary">
-            Community-funded reach
-          </T>
-          <T variant="title" style={{ fontSize: 26, lineHeight: 30 }}>
-            Turn one message into a ripple.
-          </T>
-          <T color="textMuted" style={{ fontSize: 14, lineHeight: 20 }}>
-            Back a campaign to show its message to people outside the creator’s network. You fund the reach, not the cause.
-          </T>
+        <View style={{ borderRadius: radius.xl, overflow: 'hidden', backgroundColor: c.surface, borderWidth: 1, borderColor: c.border }}>
+          <HeroRipple />
+          <View style={{ padding: space.xl, paddingTop: space.xl + 2, gap: space.md }}>
+            <T variant="overline" color="primary">
+              Community-funded reach
+            </T>
+            <T variant="title" style={{ fontSize: 28, lineHeight: 32, maxWidth: 260 }}>
+              Turn one message into a ripple.
+            </T>
+            <T color="textMuted" style={{ fontSize: 14, lineHeight: 20, maxWidth: 320 }}>
+              Back a campaign to show its message to people outside the creator’s network. You fund the reach, not the cause.
+            </T>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.lg, marginTop: space.sm }}>
+              <Pressable accessibilityRole="button" onPress={() => { haptic.light(); router.navigate('/explore'); }} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: space.lg, borderRadius: radius.pill, backgroundColor: c.primary, opacity: pressed ? 0.85 : 1 })}>
+                <T variant="smallStrong" style={{ color: c.onPrimary, fontSize: 14 }}>
+                  Explore campaigns
+                </T>
+                <Icon name="arrow-forward" size={14} color={c.onPrimary} />
+              </Pressable>
+              <Pressable accessibilityRole="button" hitSlop={8} onPress={() => { haptic.light(); router.navigate('/create'); }} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+                <T variant="smallStrong" color="primary" style={{ fontSize: 14 }}>
+                  Start a campaign
+                </T>
+              </Pressable>
+            </View>
+          </View>
+          {/* The reach estimate as a quiet footer strip, set off by a hairline. */}
           <Pressable
             onPress={() => setReachOpen(true)}
             accessibilityRole="button"
             accessibilityLabel={`Estimate: 100 rupees puts a message in front of about ${peoplePerHundred()} people. Learn how this is estimated.`}
-            hitSlop={6}
-            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.sm, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: c.primarySoft, opacity: pressed ? 0.8 : 1 })}>
-            <T variant="smallStrong" color="primary">
-              ₹100 ≈ {peoplePerHundred()} new people
+            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.xl, paddingVertical: space.md, borderTopWidth: 1, borderTopColor: c.border, opacity: pressed ? 0.7 : 1 })}>
+            <Icon name="people-outline" size={16} color={c.primary} />
+            <T variant="small" color="textMuted" style={{ flex: 1 }}>
+              <T variant="smallStrong">₹100 ≈ {peoplePerHundred()} new people</T> reached, estimated
             </T>
-            <T variant="small" color="textMuted" style={{ fontSize: 12 }}>
-              est.
-            </T>
-            <Icon name="information-circle-outline" size={14} color={c.primary} />
+            <Icon name="information-circle-outline" size={16} color={c.textSubtle} />
           </Pressable>
-          {/* One compact primary pill and a quiet text link, instead of two full-width blocks. */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.lg, marginTop: 2 }}>
-            <Pressable accessibilityRole="button" onPress={() => { haptic.light(); router.navigate('/explore'); }} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, height: 38, paddingHorizontal: space.lg, borderRadius: radius.pill, backgroundColor: c.primary, opacity: pressed ? 0.85 : 1 })}>
-              <T variant="smallStrong" style={{ color: c.onPrimary, fontSize: 14 }}>
-                Explore campaigns
-              </T>
-              <Icon name="arrow-forward" size={14} color={c.onPrimary} />
-            </Pressable>
-            <Pressable accessibilityRole="button" hitSlop={8} onPress={() => { haptic.light(); router.navigate('/create'); }} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
-              <T variant="smallStrong" color="primary" style={{ fontSize: 14 }}>
-                Start a campaign
-              </T>
-            </Pressable>
-          </View>
         </View>
       </View>
       <ReachInfo visible={reachOpen} onClose={() => setReachOpen(false)} />

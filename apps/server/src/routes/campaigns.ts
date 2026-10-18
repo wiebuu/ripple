@@ -17,7 +17,7 @@ const listQuery = z.object({
   category: z.enum(CATEGORIES).optional(),
   creatorType: z.enum(CREATOR_TYPES).optional(),
   status: z.enum(['funding', 'promoting', 'completed', 'all']).default('all'),
-  sort: z.enum(['trending', 'newest', 'closest', 'ending', 'most_backed']).default('trending'),
+  sort: z.enum(['trending', 'newest', 'closest', 'ending']).default('trending'),
   minPct: z.coerce.number().min(0).max(100).optional(),
   featured: z.coerce.boolean().optional(),
   limit: z.coerce.number().int().min(1).max(50).default(10),
@@ -55,7 +55,6 @@ campaigns.get(
       newest: (a, b) => (b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0),
       closest: (a, b) => open(a) - open(b) || pct(b) - pct(a),
       ending: (a, b) => open(a) - open(b) || (a.endsAt?.getTime() ?? Infinity) - (b.endsAt?.getTime() ?? Infinity),
-      most_backed: (a, b) => b.backerCount - a.backerCount,
     };
     rows.sort(sorters[q.sort]);
     // Offset pagination: the app requests one page at a time as the user scrolls.

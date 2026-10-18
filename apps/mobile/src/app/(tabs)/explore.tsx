@@ -20,7 +20,6 @@ const SORTS: { key: NonNullable<ListParams['sort']>; label: string; icon: IconNa
   { key: 'newest', label: 'Newest', icon: 'sparkles-outline' },
   { key: 'closest', label: 'Closest to goal', icon: 'flag-outline' },
   { key: 'ending', label: 'Ending soon', icon: 'time-outline' },
-  { key: 'most_backed', label: 'Most backed', icon: 'people-outline' },
 ];
 const STATUS: { key: NonNullable<ListParams['status']>; label: string }[] = [
   { key: 'all', label: 'All public' },

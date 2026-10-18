@@ -14,7 +14,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REPLACE-WITH-YOUR-API-URL",
+        "EXPO_PUBLIC_API_URL": "http://YOUR_VPS_IP:4000",
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "",
         "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": ""
       }

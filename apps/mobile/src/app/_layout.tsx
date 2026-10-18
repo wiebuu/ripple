@@ -11,6 +11,7 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
+import { Animated, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LoadingScreen } from '@/components/brand/LoadingScreen';
@@ -20,6 +21,9 @@ import { useSession } from '@/lib/session';
 import { useTheme } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
+
+/** How long Home gets to lay out under the loading screen before it fades away. */
+const SETTLE_MS = 350;
 
 export default function RootLayout() {
   const { c, dark } = useTheme();
@@ -34,6 +38,15 @@ export default function RootLayout() {
   const ready = (fontsLoaded || !!fontError) && hydrated && homeReady;
   // The loading screen leaves at the end of a ripple, so the app never cuts in mid-animation.
   const [splashDone, setSplashDone] = useState(false);
+  // Home mounts underneath the loading screen and settles (header, images, swirl backdrops) out of sight;
+  // only then does the loading screen fade away, so Home appears solid with nothing moving.
+  const [cover] = useState(() => new Animated.Value(1));
+  const [coverGone, setCoverGone] = useState(false);
+  useEffect(() => {
+    if (!splashDone) return;
+    const t = setTimeout(() => Animated.timing(cover, { toValue: 0, duration: 260, useNativeDriver: true }).start(() => setCoverGone(true)), SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [splashDone, cover]);
 
   useEffect(() => {
     // The native splash and LoadingScreen both follow light/dark, so the hand-off is seamless.
@@ -50,10 +63,10 @@ export default function RootLayout() {
     return () => clearTimeout(cap);
   }, [hydrated]);
 
-  if (!ready || !splashDone) return <LoadingScreen ready={ready} onDone={() => setSplashDone(true)} />;
-
   const navTheme = dark ? DarkTheme : DefaultTheme;
   return (
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      {splashDone && (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
@@ -68,5 +81,12 @@ export default function RootLayout() {
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+      )}
+      {!coverGone && (
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: cover }]} pointerEvents={splashDone ? 'none' : 'auto'}>
+          <LoadingScreen ready={ready} onDone={() => setSplashDone(true)} />
+        </Animated.View>
+      )}
+    </View>
   );
 }

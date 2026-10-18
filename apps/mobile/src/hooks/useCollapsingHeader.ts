@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Animated } from 'react-native';
+import { TAB_HEADER_HEIGHT } from '@/components/TabHeader';
 
 /**
  * Instagram-style header: it stays put for the first `delay` points of
@@ -12,7 +13,8 @@ import { Animated } from 'react-native';
  */
 export function useCollapsingHeader(delay = 96) {
   const [scrollY] = useState(() => new Animated.Value(0));
-  const [height, setHeight] = useState(0);
+  // Start at the tab header's known height so content is placed right on the first frame instead of jumping down once measured.
+  const [height, setHeight] = useState(TAB_HEADER_HEIGHT);
 
   const translateY = useMemo(() => {
     const h = Math.max(height, 1);
