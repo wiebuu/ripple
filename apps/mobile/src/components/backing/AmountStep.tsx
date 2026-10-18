@@ -5,7 +5,7 @@ import { BackingHeader } from '@/components/BackingHeader';
 import { Field } from '@/components/Field';
 import { Body, Header } from '@/components/Screen';
 import { Banner, Button, Card, Icon, ProgressBar, T, haptic, Toggle } from '@/components/ui';
-import { useBacking } from '@/lib/backing';
+import { accountName, useBacking } from '@/lib/backing';
 import { formatMoney, formatReach, pct } from '@/lib/format';
 import type { Detail } from '@/lib/queries';
 import { useSession } from '@/lib/session';
@@ -178,7 +178,8 @@ export function AmountStep({ d, onBack, onContinue }: { d: Detail; onBack: () =>
               value={b.showName}
               onValueChange={(v) => {
                 haptic.light();
-                b.set({ showName: v, displayName: v && !b.displayName && user && !user.isGuest ? user.name : b.displayName });
+                // Prefill with the account's name (read fresh, in case the session loaded after this screen); it stays editable.
+                b.set({ showName: v, displayName: v && !b.displayName.trim() ? accountName() : b.displayName });
               }}
               accessibilityLabel="Show my name publicly"
             />

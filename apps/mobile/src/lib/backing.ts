@@ -1,4 +1,11 @@
 import { create } from 'zustand';
+import { useSession } from './session';
+
+/** The signed-in person's name, to prefill "Name to show"; guests have no real name yet. */
+export function accountName() {
+  const u = useSession.getState().user;
+  return u && !u.isGuest ? u.name : '';
+}
 
 /** In-progress contribution choices, kept while the backer moves between steps. */
 type BackingState = {
@@ -18,7 +25,7 @@ export const useBacking = create<BackingState>((set, get) => ({
   displayName: '',
   email: '',
   start: (campaignId) => {
-    if (get().campaignId !== campaignId) set({ campaignId, amount: 500, showName: false, displayName: '' });
+    if (get().campaignId !== campaignId) set({ campaignId, amount: 500, showName: false, displayName: accountName() });
   },
   set: (p) => set(p),
 }));
